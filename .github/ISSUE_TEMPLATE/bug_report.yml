@@ -1,0 +1,32 @@
+name: Ошибка
+description: Воспроизводимая проблема мода, установки или VR
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "Не прикладывайте сохранения, секреты или непроверенные полные логи. Просмотрите Collect ZIP перед публикацией."
+  - type: input
+    id: version
+    attributes:
+      label: Версия мода и Steam-ветка
+      placeholder: "0.6.0-belt, RT/public или dx11_non-rt"
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Окружение
+      description: Windows, GPU и драйвер, шлем, SteamVR/OpenVR, способ подключения Quest, костюм персонажа
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги, ожидаемый и фактический результат
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Полный текст ошибки и проверенная диагностика
+      description: Для D3D нужны DXGI / HRESULT и строка, если они есть; одного номера недостаточно.

@@ -1,0 +1,24 @@
+name: Build Windows package
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Check source and compile Windows helper
+        run: python tools/build_release.py
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: RE2IVR-Windows-package
+          path: dist/*.zip
+          if-no-files-found: error

@@ -1,0 +1,13 @@
+name: Предложение
+description: Новая механика или улучшение
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Сценарий и желаемое поведение
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Как проверить и какие ограничения учитывать

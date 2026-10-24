@@ -1,0 +1,11 @@
+{
+  "version": "0.6.0-belt",
+  "source_archive_sha256": "b2df45686cb145a64e3d667958fdfd7931271186aa4f211d5e4b2bf37ecbb5d0",
+  "helper_sha256": "f2274c31f897a139eec70ff29ea46f4fb324bdd99cf3d801a38e0a22d8dc0fc6",
+  "helper_sources": {
+    "DialogInput.cs": "8f7f7561f1e9aa86b28c4db873077d2f553b45582e01584671e566d8c5f98fae",
+    "BeltOverlay.cs": "1eddb8c66555619ddc378be3670717a7f16fc25ad30c29193bc42ebbd124a50a",
+    "openvr_api.cs": "24c8556c016c63372f4a545b13d0c85dbdd8f921a5aeb5e9f633e3f459186737"
+  },
+  "notes": "Production snapshot recovered from delivered Windows package; private diagnostics and game files excluded."
+}
