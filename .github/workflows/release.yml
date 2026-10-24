@@ -1,0 +1,40 @@
+name: Publish downloadable release
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/release.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.repository == 'h1nt36r2/RE-VR'
+    runs-on: windows-2022
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Build and run helper self-tests
+        run: python tools/build_release.py
+      - name: Publish ZIP and checksum
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = (Get-Content VERSION -Raw).Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$') { throw 'Invalid release version' }
+          $tag = "v$version"
+          $archive = "dist/RE2IVR-$version.zip"
+          $checksum = "$archive.sha256"
+          $hash = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  RE2IVR-$version.zip" | Set-Content -LiteralPath $checksum -Encoding ascii
+          gh release create $tag $archive $checksum --target $env:GITHUB_SHA --title "RE2 Immersive VR $version" --notes-file "docs/releases/$version.md" --prerelease
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed; existing assets were not overwritten' }
