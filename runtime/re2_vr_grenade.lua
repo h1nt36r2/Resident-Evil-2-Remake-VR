@@ -1,0 +1,3 @@
+-- Managed replacement for REFramework's release-to-spawn extension.
+-- re2ivr_bootstrap owns grenade input and inventory accounting. Restart RE2 after updating.
+-- Keeping this exact entrypoint prevents two independent grenade generators running.

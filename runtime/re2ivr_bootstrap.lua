@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.6.0-belt"
+local VERSION="0.7.0-weapons"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -15,12 +15,15 @@ local Profiles=require("re2ivr.profiles")
 local Models=require('re2ivr.models')
 local Quickslots=require('re2ivr.quickslots')
 local Belt=require('re2ivr.belt')
-local settings={enabled=true,visuals=true,nativeHolsterModels=true,nativeGrenadeModels=true,cleanStereo=false,visualBindings={},profiles={["1"]="magazine"},hipX=.23,hipY=-.70,hipZ=.04,pouchX=-.23,pouchY=-.62,pouchZ=-.03,
+local Grenade=require('re2ivr.grenade_native')
+local Menu=require('re2ivr.menu')
+local settings={enabled=true,visuals=true,physicalGrenades=true,nativeHolsterModels=true,nativeGrenadeModels=true,cleanStereo=false,visualBindings={},profiles={["1"]="magazine"},hipX=.23,hipY=-.70,hipZ=.04,pouchX=-.23,pouchY=-.62,pouchZ=-.03,
     quickDraw=true,nativeControls=false,physicalReload=false,beltVisible=true,beltForward=.03,heightOffset=0,recenterMode='both',recenterBind='right_stick',recenterHold=1}
 local settings_ok,loaded=pcall(json.load_file,"re2ivr_mvp_settings.json")
 if not settings_ok then loaded=nil end
 if type(loaded)=="table" then
-    for _,k in ipairs({"enabled","visuals","cleanStereo","nativeHolsterModels","nativeGrenadeModels","quickDraw","nativeControls","physicalReload","beltVisible"}) do if type(loaded[k])=="boolean" then settings[k]=loaded[k] end end
+    if type(loaded.titleBackground)=='string' and #loaded.titleBackground<160 then settings.titleBackground=loaded.titleBackground end
+    for _,k in ipairs({"enabled","visuals","physicalGrenades","cleanStereo","nativeHolsterModels","nativeGrenadeModels","quickDraw","nativeControls","physicalReload","beltVisible"}) do if type(loaded[k])=="boolean" then settings[k]=loaded[k] end end
     if loaded.recenterMode=='both' or loaded.recenterMode=='yaw' or loaded.recenterMode=='height' then settings.recenterMode=loaded.recenterMode end
     if loaded.recenterBind=='right_stick' or loaded.recenterBind=='left_grip_r3' or loaded.recenterBind=='off' then settings.recenterBind=loaded.recenterBind end
     if type(loaded.heightOffset)=='number' and loaded.heightOffset==loaded.heightOffset and math.abs(loaded.heightOffset)<=.30 then settings.heightOffset=loaded.heightOffset end
@@ -54,6 +57,8 @@ local gear={}
 local controls=Controls.new(settings)
 local stereoStatus={status='not_sampled'}
 Presentation.init()
+Grenade.init()
+Menu.init(settings)
 -- Stability hotfix: no new native Mesh allocation/render hooks, even with old settings.
 Models.ready=false;Models.status='Native mesh copies disabled in stability build'
 settings.nativeHolsterModels=false;settings.nativeGrenadeModels=false;settings.cleanStereo=true
@@ -81,6 +86,7 @@ local initialized,failure=pcall(function()
 end)
 ready=initialized;err=initialized and "" or tostring(failure)
 local function stop(message)
+    Grenade.stop()
     Native.stop();engine:reset(message);input=nil;state=nil
     Models.prepare(nil,nil,nil,nil,nil,false)
     controls:release()
@@ -97,6 +103,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
         local now=os.clock()
         input=VR.sample()
         if not input.active then
+            Grenade.stop()
             Belt.publish(nil,input,gear,engine,settings,now)
             Native.control(false)
             if tracking then
@@ -109,6 +116,8 @@ re.on_pre_application_entry("UpdateBehavior",function()
         if not tracking then engine:reset('Tracking resumed: release and squeeze right grip');last=now end
         tracking=true
         current=Native.refresh()
+        local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls)
+        if not grenadeOK then Grenade.locked=true;Grenade.stop();Grenade.status=tostring(grenadeError) end
         if Inventory.learn(current,settings.visualBindings) then gear={};json.dump_file("re2ivr_mvp_settings.json",settings) end
         local dt=math.min(math.max(now-last,.001),.1);last=now
         if not settings.enabled then stop("Mod disabled");return end
@@ -122,8 +131,8 @@ re.on_pre_application_entry("UpdateBehavior",function()
         -- A supported name alone cannot establish a working immersive input/ammo contract.
         -- Incomplete snapshots and desktop/menu sessions keep the original game's controls.
         local immersive=not settings.nativeControls and not nativeOverride and input.active and state~=nil
-        local finiteBlock=not settings.nativeControls and not nativeOverride and input.active and current and current.ranged and current.infinity
-        Native.control(immersive or finiteBlock or false)
+        -- Preserve the game's genuine bonus weapons; never set Infinity on regular weapons.
+        Native.control(immersive or false)
         for _,event in ipairs(Native.drain_events()) do engine:spent(event.key,event.profile or (state and state.profile)) end
         local oldStage,oldPlace=engine.stage,engine.place
         if current and frames%120==0 then
@@ -166,6 +175,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
             json.dump_file("re2ivr_mvp_status.json",{schema=1,version=VERSION,ready=ready,enabled=settings.enabled,
                 active=input.active,profile=state and state.profile or "unsupported",weaponType=current and current.wt or nil,
                 place=engine.place,stage=engine.stage,message=engine.message,locked=engine.locked,
+                grenadeStatus=Grenade.status,grenadeReady=Grenade.ready,grenadeLocked=Grenade.locked,grenadeStage=Grenade.gesture.stage,
                 loaded=state and state.loaded or nil,reserve=state and state.reserve or nil,commits=engine.commits,error=err,
                 nativeInfinity=current and current.infinity or false,fireGateReady=Native.fireGateReady,
                 ammoFault=current and Native.faults[Native.key(current)] or nil,quickDraw=settings.quickDraw,nativeControls=settings.nativeControls,
@@ -204,6 +214,11 @@ re.on_draw_ui(function()
     imgui.text('Mouse clicks at current desktop cursor: place it on OK in SteamVR Desktop, then close dashboard.')
     if imgui.button('Refresh input helper status') then Presentation.helper_status() end
     imgui.text('RE NET: Main menu > Options > RE NET > Play Data Settings > Off.')
+    imgui.text('Physical grenades: '..tostring(Grenade.status))
+    if imgui.button(settings.physicalGrenades and 'Use native grenade trigger' or 'Use physical grenade pin and release') then
+        settings.physicalGrenades=not settings.physicalGrenades;Grenade.stop();json.dump_file('re2ivr_mvp_settings.json',settings)
+    end
+    if imgui.tree_node('Title background recovery') then Menu.ui();imgui.tree_pop() end
     imgui.text("State: "..engine.place.." / "..engine.stage)
     imgui.text(engine.message)
     if err~="" then imgui.text(err) end
@@ -275,7 +290,7 @@ re.on_draw_ui(function()
         imgui.text("Weapon: "..current.name.." / type "..tostring(current.wt).."; loaded "..current.loaded.." / "..current.capacity)
         imgui.text('Reload profile: '..tostring(profile or 'native game controls'))
         if not current.ranged then imgui.text('Non-Gun weapon: native game controls retained') end
-        if current.infinity and Native.is_gun(current) and settings.profiles[tostring(current.wt)]~='native' then imgui.text('Infinite bonus firearm blocked in finite-ammo VR mode: equip a regular weapon') end
+        if current.infinity then imgui.text('Native bonus weapon: original ammo rules and firing retained') end
         if Native.faults[Native.key(current)] then imgui.text(Native.faults[Native.key(current)]..'; inspect Collect report') end
         if not Native.fireGateReady then imgui.text('Direct Gun fire gate unavailable: immersive weapon profiles disabled') end
         for _,kind in ipairs({'magazine','revolver','pump','breech','native'}) do

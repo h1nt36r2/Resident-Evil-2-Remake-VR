@@ -6,3 +6,7 @@
 - Resident Evil 2, character models, weapon assets and associated marks belong to Capcom and other respective owners. No Capcom game data, saves or extracted assets are licensed under this project's MIT license or included in the source tree.
 
 This project is independent and is not endorsed by Capcom, Valve or Meta. Upstream documentation and issue reports informed troubleshooting; they do not certify this mod's compatibility.
+
+## Физические гранаты
+
+Native-интеграция 0.7.0 опирается на MIT-скрипт REFramework v1.5.9.1 `scripts/re2_vr_grenade.lua`: генерация, поворот скорости и Equipment.use. Полная лицензия upstream включена в third_party/REFramework-LICENSE.txt. Старый autorun заменён заглушкой для предотвращения параллельного броска.

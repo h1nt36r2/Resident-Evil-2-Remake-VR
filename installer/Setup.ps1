@@ -143,7 +143,9 @@ try {
     if(-not $incoming.ContainsKey('dinput8.dll') -or (-not $incoming.ContainsKey('openvr_api.dll') -and -not $incoming.ContainsKey('openxr_loader.dll'))) {throw 'Archive is not a complete RE2 VR package.'}
     foreach($f in $manifest.files) {
         $rel=$f.path.Replace('/','\')
-        if($incoming.ContainsKey($rel)) {throw 'Framework/mod file collision.'}
+        if($incoming.ContainsKey($rel)) {
+            if($rel -ne 'reframework\autorun\re2_vr_grenade.lua' -or (Hash $incoming[$rel]) -ne '9AA606200361013305CCAA6A5E4B94A37D448E2820FC13D09556EF4BADC672EA') {throw 'Framework/mod file collision.'}
+        }
         $incoming[$rel]=Child (Join-Path $PSScriptRoot 'payload') $rel
     }
     if($state) {foreach($f in $state.files) {if(-not $incoming.ContainsKey($f.path)) {throw 'Update drops a managed file. Roll back/remove first.'}}}
