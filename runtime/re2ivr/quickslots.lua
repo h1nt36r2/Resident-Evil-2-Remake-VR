@@ -3,6 +3,7 @@ local Q={last=true,message='',requests=0}
 local Belt=require('re2ivr.belt')
 function Q.step(input,current,gear,engine,select,selectMain,selectShortcut)
     if not input or not input.active or not current or not current.safe then Q.last=true;return false end
+    if current.isDevice or current.storyNative then Q.last=input.rightGrip;return false end -- story tools keep native grip
     local pressed=input.rightGrip and not Q.last;Q.last=input.rightGrip
     if not pressed or engine.place=='held' then return false end
     local _,_,body=C.anchors(input,engine.o)

@@ -4,6 +4,9 @@ on:
     branches: [main]
     paths: ['VERSION', '.github/workflows/release.yml']
   workflow_dispatch:
+env:
+  POWERSHELL_TELEMETRY_OPTOUT: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
 permissions:
   contents: read
 concurrency:

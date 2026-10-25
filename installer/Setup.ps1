@@ -112,7 +112,7 @@ try {
     if(-not $FrameworkArchive) {
         [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
         $api='https://api.github.com/repos/praydog/REFramework/releases/tags/'+$releaseTag
-        $release=Invoke-RestMethod -Uri $api -Headers @{'User-Agent'='RE2IVR-Setup/0.6.0-belt'}
+        $release=Invoke-RestMethod -Uri $api -Headers @{'User-Agent'='RE2IVR-Setup/0.8.2-ada-fix'}
         $assets=@($release.assets|Where-Object {if($Branch -eq 'RT') {$_.name -eq 'RE2.zip'} else {$_.name -match '^RE2_TDB[^/]*\.zip$'}})
         if($assets.Count -ne 1) {throw 'Could not select an unambiguous official RE2 asset.'}
         $asset=$assets[0];$assetName=$asset.name
@@ -144,7 +144,12 @@ try {
     foreach($f in $manifest.files) {
         $rel=$f.path.Replace('/','\')
         if($incoming.ContainsKey($rel)) {
-            if($rel -ne 'reframework\autorun\re2_vr_grenade.lua' -or (Hash $incoming[$rel]) -ne '9AA606200361013305CCAA6A5E4B94A37D448E2820FC13D09556EF4BADC672EA') {throw 'Framework/mod file collision.'}
+            # Only reviewed upstream scripts may be replaced; all other collisions stay fatal.
+            $reviewed=@{
+                'reframework\autorun\re2_vr_grenade.lua'='9AA606200361013305CCAA6A5E4B94A37D448E2820FC13D09556EF4BADC672EA'
+                'reframework\autorun\re2_vr_crosshair.lua'='634D85D182886A572904E0A5D097303B1B7DA34F97EB9A1C9E2E828DC8FB7D47'
+            }
+            if(-not $reviewed.ContainsKey($rel) -or (Hash $incoming[$rel]) -ne $reviewed[$rel]) {throw 'Framework/mod file collision.'}
         }
         $incoming[$rel]=Child (Join-Path $PSScriptRoot 'payload') $rel
     }

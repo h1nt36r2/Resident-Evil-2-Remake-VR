@@ -27,7 +27,7 @@ function B.publish(current,input,gear,engine,settings,now)
     if not safe and current and current.reasons and #current.reasons>0 then
         safe=true;for _,reason in ipairs(current.reasons) do if reason~='vanillaReload' then safe=false end end
     end
-    json.dump_file('re2ivr_belt.json',{schema=1,time=os.time(),enabled=settings.beltVisible and input and input.active and safe or false,
+    json.dump_file('re2ivr_belt.json',{schema=1,time=os.time(),enabled=settings.beltVisible and input and input.active and safe and not current.storyNative or false,
         slots=B.slots(current,gear,engine,settings)})
 end
 return B

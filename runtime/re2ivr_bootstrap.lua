@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.8.1-menu-input"
+local VERSION="0.8.2-ada-fix"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -18,6 +18,7 @@ local Belt=require('re2ivr.belt')
 local Grenade=require('re2ivr.grenade_native')
 local Menu=require('re2ivr.menu')
 local MenuControls=require('re2ivr.menu_controls_native')
+local Story=require('re2ivr.story')
 local settings={enabled=true,visuals=true,physicalGrenades=true,nativeHolsterModels=true,nativeGrenadeModels=true,cleanStereo=false,visualBindings={},profiles={["1"]="magazine"},hipX=.23,hipY=-.70,hipZ=.04,pouchX=-.23,pouchY=-.62,pouchZ=-.03,
     quickDraw=true,nativeControls=false,physicalReload=false,beltVisible=true,beltForward=.03,heightOffset=0,recenterMode='both',recenterBind='right_stick',recenterHold=1}
 local settings_ok,loaded=pcall(json.load_file,"re2ivr_mvp_settings.json")
@@ -132,7 +133,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
         tracking=true
         refresh_scene()
         Native.update_belt_hold(input,settings.enabled and not settings.nativeControls)
-        local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls)
+        local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls and not Story.native)
         if not grenadeOK then Grenade.locked=true;Grenade.stop();Grenade.status=tostring(grenadeError) end
         if Inventory.learn(current,settings.visualBindings) then gear={};json.dump_file("re2ivr_mvp_settings.json",settings) end
         local dt=math.min(math.max(now-last,.001),.1);last=now
@@ -207,7 +208,9 @@ re.on_pre_application_entry("UpdateBehavior",function()
                 nativeInfinity=current and current.infinity or false,fireGateReady=Native.fireGateReady,
                 ammoFault=current and Native.faults[Native.key(current)] or nil,quickDraw=settings.quickDraw,nativeControls=settings.nativeControls,
                 safe=current and current.safe,reasons=current and current.reasons,weaponName=current and current.name,
-                input={rightGrip=input.rightGrip,leftGrip=input.leftGrip},snapshotAvailable=state~=nil,
+                character=current and current.character,characterKnown=current and current.characterKnown,device=current and current.isDevice,weaponClass=(current and current.typeName) or Native.observedWeaponClass,
+                storyNative=Story.native,storyReason=Story.reason,characterName=Story.characterName,
+                input={rightGrip=input.rightGrip,leftGrip=input.leftGrip,rightTrigger=input.rightTrigger},snapshotAvailable=state~=nil,
                 beltSelection=Quickslots.message,shortcutStatus=require('re2ivr.shortcuts').status,beltSubWeapon=Native.beltSub,beltHold=Native.beltHold,menuControls=MenuControls.status,menuControlsError=MenuControls.error})
         end
     end)

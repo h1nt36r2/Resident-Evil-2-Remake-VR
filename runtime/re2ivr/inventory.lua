@@ -39,8 +39,10 @@ function I.read(bindings,profiles)
             local profile=profiles[wt] or Profiles.detect(name)
             if profile=='native' then profile=Profiles.detect(name) end
             local sub=slot:call('get_IsSubWeapon')==true
+            local device=Profiles.is_device({name=name})
             local named=subkind(name)
             local kind=named or bindings[wt] or (not sub and ((profile=='pump' and 'shotgun') or (profile=='breech' and 'launcher') or (profile and 'pistol'))) or nil
+            if device then kind='scanner' end
             if sub and kind=='pistol' then kind=named end -- retire a stale main-weapon binding
             local quantity=(kind=='grenade' or kind=='flash') and (type(number)=='number' and math.max(0,number) or 0) or 1
             if not known[wt] then

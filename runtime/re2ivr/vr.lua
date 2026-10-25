@@ -34,6 +34,7 @@ local function sample()
         leftStickClick=vrmod:is_action_active(click,ls)==true,rightStickClick=vrmod:is_action_active(click,rs)==true,
         leftStickMagnitude=magnitude(vrmod:get_left_stick_axis()),rightStickMagnitude=magnitude(vrmod:get_right_stick_axis()),
         eject=vrmod:is_action_active(vrmod:get_action_b_button(),rs)==true,
+        rightTrigger=vrmod:is_action_active(vrmod:get_action_trigger(),rs)==true,
         -- Tracking-space stage floor. Standing origin is a HEAD origin, not a floor.
         floor=0}
 end

@@ -43,3 +43,6 @@ do
  assert(not ok and consumed)
 end
 print('PASS belt priority: assigned up/down zones, nearest pouch, no fallback pistol on empty zones, one selection per grip')
+raw.isDevice=true;Q.last=false;i.rightGrip=true;i.right=v(.23,1,.04)
+assert(not Q.step(i,raw,gear,engine,function()error('EMF mode stole grenade')end,main,function()error('EMF mode stole shortcut')end))
+raw.isDevice=nil

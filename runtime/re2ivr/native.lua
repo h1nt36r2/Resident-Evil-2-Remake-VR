@@ -1,5 +1,7 @@
 -- Live-schema-backed native RE2 adapter. No raw inventory writes.
 local N={fireGateReady=false,events={},faults={},pumpPending={},finiteOnly=true,auditFrame=0,ledger={}}
+local Profiles=require('re2ivr.profiles')
+local Story=require('re2ivr.story')
 local threads={}
 local function context()
     local id=thread.get_id()
@@ -32,6 +34,7 @@ local policy=function() return false end
 local waiting={}
 local function account(raw,baseline,accepted)
     if raw.player~=N.sessionPlayer then return end -- discard callbacks from a previous player scene
+    if raw.characterKnown and N.sessionCharacterKnown and raw.character~=N.sessionCharacter then return end
     local k=key(raw)
     local ok,n=pcall(function() return api.loaded:call(raw.equipment,raw.wt) end)
     if ok and n<baseline then
@@ -52,9 +55,17 @@ local function component(player,name)
     return t and player:call("getComponent(System.Type)",t) or nil
 end
 local function read()
+    N.observedWeaponClass=nil
     local manager=sdk.get_managed_singleton(sdk.game_namespace("PlayerManager"))
     local player=manager and manager:call("get_CurrentPlayer")
     N.observedPlayer=player
+    local inventory=player and component(player,'survivor.Inventory')
+    N.observedCharacterKnown=false
+    local characterOK,character=pcall(function()return inventory and inventory:call('get_SurvivorType')end)
+    if characterOK and type(character)=='number' and character==character and character>=0 and character%1==0 then
+        N.observedCharacterKnown=true;N.observedCharacter=character
+    end
+    Story.update(inventory,N.observedCharacter,N.observedCharacterKnown)
     if not player then return nil,"No player" end
     local eq=component(player,"survivor.Equipment")
     local condition=component(player,"survivor.SurvivorCondition")
@@ -62,19 +73,25 @@ local function read()
     if not eq or not condition or not gui then return nil,"Incomplete scene" end
     local weapon=eq:call("get_EquipWeapon")
     local slot=eq:call("get_EquipSlot")
+    local type_ok,typeName=pcall(function()return weapon and weapon:get_type_definition():get_full_name()end)
+    typeName=type_ok and typeName and tostring(typeName) or ''
+    N.observedWeaponClass=typeName
     if not weapon or not slot then return nil,"No equipped weapon" end
     local wt=eq:call("get_EquipType")
+    local name_ok,name=pcall(function()return slot:call('get_WeaponName')end)
+    name=name_ok and tostring(name) or ''
+    local isDevice=Profiles.is_device({name=name,typeName=typeName})
     local gun_ok,gun=pcall(function() return N.gunType and weapon:get_type_definition():is_a(N.gunType) end)
-    local ranged=gun_ok and gun==true
+    local ranged=gun_ok and gun==true and not isDevice
+    local hasAmmoContract=ranged and not Story.native
     local reasons={}
     for name,value in pairs({gui=gui:call("get_IsGuiOpen"),dead=condition:call("get_IsDead"),
         event=condition:call("get_IsEvent"),grabbed=condition:call("get_IsJack"),
         changingWeapon=condition:call("get_IsChangeWeapon"),vanillaReload=condition:call("get_IsReload")}) do
         if value then reasons[#reasons+1]=name end
     end
-    local inventory=component(player,"survivor.Inventory")
-    local reserve=nil; if not ranged then reserve=0 end
-    if ranged and inventory then
+    local reserve=nil; if not hasAmmoContract then reserve=0 end
+    if hasAmmoContract and inventory then
         local bullet=slot:call("get_BulletID")
         local slots=inventory:call("get_Slots")
         if slots then
@@ -91,13 +108,13 @@ local function read()
             end
         end
     end
-    local name_ok,name=pcall(function() return slot:call('get_WeaponName') end)
-    return {player=player,equipment=eq,weapon=weapon,slot=slot,wt=wt,name=name_ok and tostring(name) or '',ranged=ranged,safe=#reasons==0,reasons=reasons,reserve=reserve,
-        loaded=ranged and api.loaded:call(eq,wt) or 0,capacity=ranged and api.capacity:call(slot) or 0,
-        reloadable=ranged and api.reloadable:call(eq,wt) or 0,infinity=slot:call("get_Infinity")}
+    return {player=player,character=N.observedCharacterKnown and N.observedCharacter or nil,characterKnown=N.observedCharacterKnown,
+        equipment=eq,weapon=weapon,slot=slot,wt=wt,name=name,typeName=typeName,isDevice=isDevice,storyNative=Story.native,ranged=ranged,safe=#reasons==0,reasons=reasons,reserve=reserve,
+        loaded=hasAmmoContract and api.loaded:call(eq,wt) or 0,capacity=hasAmmoContract and api.capacity:call(slot) or 0,
+        reloadable=hasAmmoContract and api.reloadable:call(eq,wt) or 0,infinity=slot:call("get_Infinity")}
 end
 local function same(a,b)
-    return a and b and a.player==b.player and a.weapon==b.weapon and a.equipment==b.equipment and a.slot==b.slot
+    return a and b and a.player==b.player and a.character==b.character and a.weapon==b.weapon and a.equipment==b.equipment and a.slot==b.slot
         and a.wt==b.wt and a.loaded==b.loaded and a.capacity==b.capacity and a.reloadable==b.reloadable and a.reserve==b.reserve
 end
 
@@ -235,12 +252,16 @@ function N.refresh()
         return nil
     end
     N.readError=nil
-    if N.sessionPlayer~=N.observedPlayer then
+    local newPlayer=N.sessionPlayer~=N.observedPlayer
+    local newCharacter=not newPlayer and N.sessionCharacterKnown and N.observedCharacterKnown and N.sessionCharacter~=N.observedCharacter
+    if newPlayer or newCharacter then
         -- Fresh player/new game owns a fresh ammo ledger. Never touch the old scene's weapon.
         N.sessionPlayer=N.observedPlayer;N.sceneEpoch=(N.sceneEpoch or 0)+1
         enabled=false;hidden=nil;waiting={};N.events={};N.faults={};N.pumpPending={};N.ledger={};N.auditFrame=0
         N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil
     end
+    if newPlayer then N.sessionCharacterKnown=false;N.sessionCharacter=nil end
+    if N.observedCharacterKnown then N.sessionCharacterKnown=true;N.sessionCharacter=N.observedCharacter end
     current=nextCurrent;if current and current.safe then N.auditFrame=N.auditFrame+1 end
     if current then
         local k=key(current);local a=waiting[k]
@@ -308,7 +329,7 @@ function N.select_shortcut(direction)
     return selected,why,wt
 end
 function N.update_belt_hold(input,allowed)
-    if not allowed or not input or not input.active or not current or N.beltOwner~=current.equipment then
+    if not allowed or Story.native or not input or not input.active or not current or current.isDevice or N.beltOwner~=current.equipment then
         N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil;return
     end
     if not N.beltSub then return end
@@ -330,17 +351,20 @@ function N.scene_safe()
     end
     return true
 end
-function N.control(value) enabled=value end
+function N.control(value) enabled=value and not Story.native and not (current and current.isDevice) end
 function N.visible(value)
     -- Never dereference a weapon retained from a different scene/identity.
     if not current then hidden=nil;return end
+    if Story.native then return end
+    if current.isDevice then return end -- scanner visibility belongs to the story/device logic
     if not value then api.draw:call(current.weapon,false);hidden=current.weapon
     elseif hidden==current.weapon then api.draw:call(current.weapon,true);hidden=nil end
 end
 function N.stop() enabled=false;N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil;N.visible(true) end
 function N.commit(expected,n)
     local before=read()
-    assert(enabled and before and before.safe and same(before,expected),"Native snapshot changed")
+    assert(enabled and not Story.native and before and not before.isDevice and before.safe and same(before,expected),"Native snapshot changed")
+    assert(not N.sessionCharacterKnown or (before.characterKnown and before.character==N.sessionCharacter),'Character identity not stable')
     assert(not before.infinity and n>=1 and n%1==0 and n<=before.reloadable and n<=before.reserve
         and before.loaded+n<=before.capacity,"Invalid ammo request")
     permit_reload=thread.get_id()

@@ -7,6 +7,10 @@ for _,name in ipairs({'Minigun','Chemical Flamethrower','Spark Shot','ATM-4','An
  assert(P.resolve({wt=99,name=name},{})==nil)
 end
 assert(P.detect('Broom Hc')=='magazine')
+for _,raw in ipairs({{name='EMF Visualizer',wt=1},{name='EMF-визуализатор',wt=1},{name='unknown',typeName='app.ropeway.implement.EMF',wt=1}}) do
+ assert(P.is_device(raw) and P.resolve(raw,{['1']='magazine'})==nil,'EMF must ignore a persisted gun override')
+end
+assert(not P.is_device({name='Chemical Flamethrower'}))
 local b={v(1,0,0),v(0,1,0),v(0,0,1)}
 local function setup(profile,loaded,capacity)
  local s={identity='gun',key='slot:gun',loaded=loaded,reserve=8,capacity=capacity,reloadable=capacity-loaded,safe=true,profile=profile}
