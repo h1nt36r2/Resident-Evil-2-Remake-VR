@@ -306,10 +306,9 @@ local function select_owned(wt,sub)
             and (slot:call('get_IsSubWeapon')==true)==sub and slot:call('get_WeaponType')==wt then
             -- Let Inventory update its MainSlot/SubSlot and equipment events together.
             -- Direct Equipment.changeWeapon alone can leave the inventory's sub-slot unchanged.
-            if sub and (type(slot:call('get_Number'))~='number' or slot:call('get_Number')<1) then return false,'Pouch item depleted' end
-            local accepted,message=require('re2ivr.equip').apply(slot,n,inv,current.equipment,api,wt,sub,current.slot==slot)
+            local accepted,message=require('re2ivr.equip').apply(slot,n,inv,current.equipment,api,wt,sub,current.slot==slot,sub)
             if not accepted then return false,message end
-            if sub then N.beltSub=wt;N.beltHold='held';N.beltOwner=current.equipment else N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil end
+            if sub then N.beltSub=wt;N.beltHold=nil;N.beltOwner=current.equipment else N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil end
             return true,message
         end
     end
@@ -341,9 +340,9 @@ function N.update_belt_hold(input,allowed)
         N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil;return
     end
     if not N.beltSub then return end
-    if input.rightGrip then N.beltHold='held'
-    elseif input.leftGrip then N.beltHold='release_left' -- pin hand must not immediately draw the knife
-    else N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil end
+    -- Pouch grip chooses; LEFT grip holds the chosen native subweapon.
+    -- Releasing it clears only hold interception, not the inventory selection.
+    N.beltHold=input.leftGrip and 'held' or nil
 end
 function N.scene_safe()
     if N.readError then return false end

@@ -46,3 +46,25 @@ print('PASS belt priority: assigned up/down zones, nearest pouch, no fallback pi
 raw.isDevice=true;Q.last=false;i.rightGrip=true;i.right=v(.23,1,.04)
 assert(not Q.step(i,raw,gear,engine,function()error('EMF mode stole grenade')end,main,function()error('EMF mode stole shortcut')end))
 raw.isDevice=nil
+
+do
+ -- Either hand can grip a subweapon icon. LEFT grip away from icons is hold-only.
+ raw.safe=true;raw.isDevice=nil;raw.storyNative=nil
+ local items={{kind='knife',sub=true,count=1,weaponType='300'},{kind='grenade',sub=true,count=2,weaponType='200'},{kind='flash',sub=true,count=1,weaponType='201'}}
+ local chosen={}
+ local function choose(id)chosen[#chosen+1]=id;return true,'Selected; hold LEFT grip'end
+ i.right=v(2,1,0);i.left=v(-.34,1.08,-.12);i.rightGrip=false;i.leftGrip=false
+ Q.step(i,raw,items,engine,choose)
+ i.leftGrip=true;assert(Q.step(i,raw,items,engine,choose));assert(chosen[1]==300)
+ for n=1,5 do Q.step(i,raw,items,engine,choose)end;assert(#chosen==1)
+ i.leftGrip=false;Q.step(i,raw,items,engine,choose)
+ i.left=v(2,1,0);i.leftGrip=true;assert(not Q.step(i,raw,items,engine,choose));assert(#chosen==1)
+ -- Right-hand icon selects grenade while LEFT grip remains held.
+ i.right=v(-.07,1.06,-.19);i.rightGrip=true
+ assert(Q.step(i,raw,items,engine,choose));assert(chosen[2]==200)
+ i.rightGrip=false;Q.step(i,raw,items,engine,choose)
+ i.right=v(-.20,1.06,-.19);i.rightGrip=true
+ assert(not Q.step(i,raw,items,engine,choose,nil,nil,true),'Live grenade blocks changing selection')
+ assert(#chosen==2)
+end
+print('PASS subweapon icon selection with either grip; left grip elsewhere holds without selecting, live grenade blocks reselection')

@@ -1,3 +1,11 @@
+# 0.8.6
+
+- Pouch grip with either hand selects a subweapon; LEFT grip holds it, release preserves selection.
+- Remove obsolete left-grip pin lock and grenade-stack count gate for knives.
+- Icon selection uses Inventory without requiring forced parts-based draw.
+- Live grenades use LEFT grip hold/release with RIGHT trigger and right-hand release velocity; reselection while live is blocked.
+- Added actual native adapter selection/hold regression and both-hand icon tests. Hardware validation pending.
+
 # 0.8.5
 
 - Fix shoulder/main-weapon selection: request native main category change using reflected parts; redraw only confirmed equipped weapon.

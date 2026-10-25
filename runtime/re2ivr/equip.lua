@@ -23,11 +23,13 @@ function E.parts(slot)
  end)
  if ok and valid(value)then return value end
 end
-function E.apply(slot,index,inv,eq,api,wt,sub,already)
- local parts=E.parts(slot)
+function E.apply(slot,index,inv,eq,api,wt,sub,already,selectOnly)
+ local parts
+ if not selectOnly then parts=E.parts(slot)end
  local category
  if sub then category=api.subCategory else category=api.mainCategory end
  if not already and api.equipSlot:call(inv,index)~=true then return false,'Native inventory refused belt item'end
+ if selectOnly then return true,'Subweapon selected: hold LEFT grip to draw' end
  if eq:call('get_EquipType')==wt then
   local arm=eq:call('getWeapon',wt)
   if arm then api.draw:call(arm,true)end

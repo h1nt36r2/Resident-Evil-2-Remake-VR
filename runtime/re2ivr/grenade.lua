@@ -1,7 +1,7 @@
 -- Grip holds; a fresh right-trigger press primes once; grip release throws.
 local G={}
 function G.new()
- local s={stage='idle',message='Grip pouch, press right trigger, release grip to throw',throws=0,primes=0}
+ local s={stage='idle',message='Select pouch icon, hold LEFT grip, press RIGHT trigger, release LEFT grip',throws=0,primes=0}
  function s:reset()
   self.stage='idle';self.lastGrip=true;self.lastTrigger=true;self.identity=nil
  end
@@ -17,7 +17,7 @@ function G.new()
    self.stage='failed' -- consume before native calls: never retry an uncertain spawn/debit
    self.primes=self.primes+1
    local ok,why=prime(i)
-   if ok then self.stage='armed';self.message='LIVE grenade: move hand and release right grip'
+   if ok then self.stage='armed';self.message='LIVE grenade: move hand and release LEFT grip'
    else self.message='Priming stopped: '..tostring(why)end
   end
   local release=self.lastGrip and not grip

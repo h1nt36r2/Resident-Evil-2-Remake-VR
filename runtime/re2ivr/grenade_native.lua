@@ -103,7 +103,7 @@ function G.init()
    end
   end
  end)
- G.ready=ok;G.status=ok and 'Grip pouch -> right trigger -> release grip to throw' or tostring(why)
+ G.ready=ok;G.status=ok and 'Select pouch icon -> LEFT grip -> RIGHT trigger -> release LEFT grip' or tostring(why)
 end
 function G.stop()
  -- A primed shell is never refunded, deleted, re-created or given a fresh fuse.
@@ -111,11 +111,11 @@ function G.stop()
  active=false;raw=nil;generator=nil;pose=nil;pending=nil;G.live=nil;gesture:reset()
 end
 function G.reset_session()
- G.stop();G.locked=false;G.pickup=nil;G.hidden=nil
+ G.stop();G.locked=false;G.pickup=nil;G.hidden=nil;G.lastHold=true
  if G.ready then G.status='New scene: grenade interaction reset'end
 end
 function G.is_live()return G.live~=nil or pending~=nil end
-function G.begin_pickup(wt)G.pickup={wt=tostring(wt),expires=os.clock()+3}end
+function G.begin_pickup(wt)G.pickup={wt=wt and tostring(wt) or nil,expires=os.clock()+3}end
 local function release(i)
  local ok,why=pcall(function()
   local pos=hand(i)
@@ -132,8 +132,17 @@ local function release(i)
  if not ok then G.live=nil;pending=nil;G.locked=true end
  return ok,why
 end
-function G.step(i,current,enabled,scene)
+function G.step(sample,current,enabled,scene)
  active=false
+ local i=sample
+ if sample and sample.active then
+  -- Native RE2 holds subweapons with LEFT grip; the item stays in the RIGHT hand.
+  i={};for k,value in pairs(sample)do i[k]=value end
+  local hold=sample.leftGrip==true
+  if hold and G.lastHold==false then G.begin_pickup(nil)end
+  G.lastHold=hold
+  i.rightGrip=hold
+ else G.lastHold=true end
  if G.pickup and (os.clock()>G.pickup.expires or not enabled or not i or not i.active or not i.rightGrip)then G.pickup=nil end
  if not enabled or not G.ready or G.locked or not i or not i.active then restore(current);G.stop();return end
  -- A last grenade may remove its inventory slot immediately on priming.
@@ -159,7 +168,7 @@ function G.step(i,current,enabled,scene)
   end)
   if not ok then G.live=nil;pending=nil;G.locked=true;G.status=tostring(why);restore(current);return end
   if raw and ((scene and scene.player==G.owner) or (current and current.equipment==raw.equipment))then active=true end
-  G.status='LIVE grenade: release right grip; native fuse already running'
+  G.status='LIVE grenade: release LEFT grip; native fuse already running'
   return
  end
  if not current or not current.safe then restore(current);G.stop();return end
@@ -172,7 +181,7 @@ function G.step(i,current,enabled,scene)
  restore(current)
  if raw and raw.weapon~=current.weapon then G.stop()end
  raw=current;generator=gen;active=true
- if G.pickup and G.pickup.wt==tostring(current.wt)then
+ if G.pickup and (G.pickup.wt==nil or G.pickup.wt==tostring(current.wt))then
   gesture:reset();gesture.identity=tostring(current.weapon)..':'..tostring(current.slot)
   gesture.lastGrip=false;gesture.lastTrigger=i.rightTrigger==true;G.pickup=nil
  end

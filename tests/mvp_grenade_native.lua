@@ -59,9 +59,9 @@ local hidden=false
 function draw.execute(_,value)hidden=not value end
 local G=require('re2ivr.grenade_native');G.init();assert(G.ready,G.status)
 local v=require('re2ivr.interaction').math.v
-local i={active=true,head=v(0,1,0),rightTrigger=false,rightGrip=true,leftGrip=false,right=v(0,1,0),left=v(0,1,0),rightVelocity=v(2,1,-3),rightAngular=v(0,0,1)}
+local i={active=true,head=v(0,1,0),rightTrigger=false,rightGrip=false,leftGrip=true,right=v(0,1,0),left=v(0,1,0),rightVelocity=v(2,1,-3),rightAngular=v(0,0,1)}
 local function step()G.step(i,raw,true)end
-G.begin_pickup(50);step();assert(G.gesture.stage=='held','Belt grip must transfer into held grenade without re-gripping')
+G.begin_pickup(50);step();assert(G.gesture.stage=='held','LEFT grip must hold selected grenade without re-gripping')
 assert(hooks[request].pre({[2]=raw.equipment})=='skip')
 assert(hooks[fire].pre({[2]=raw.equipment,[3]=50})=='skip')
 assert(hooks[fire].post(1)==0)
@@ -70,19 +70,19 @@ assert(spawns==1 and debits==1 and count==2 and G.live and hidden,'Prime must sp
 assert(linear.x==0 and linear.z==0,'Live shell must stay in hand')
 for n=1,10 do step()end;assert(spawns==1 and debits==1)
 i.right=v(1,1,0);step();assert(attached.x==1,'Live shell follows hand')
-i.rightGrip=false;step()
+i.leftGrip=false;i.rightGrip=true;step()
 assert(spawns==1 and debits==1 and not G.live and not hidden and linear.x==2 and linear.z==-3,G.status)
 for n=1,20 do step()end;assert(spawns==1 and debits==1)
 -- Native detonation in hand clears tether; it never generates a second shell.
-i.rightGrip=true;i.rightTrigger=false;step();i.rightTrigger=true;step()
+i.leftGrip=true;i.rightGrip=false;i.rightTrigger=false;step();i.rightTrigger=true;step()
 assert(spawns==2 and G.live)
 hooks[destroy].pre({[2]=shell});hooks[destroy].post(nil);assert(not G.live)
-i.rightGrip=false;step();assert(spawns==2 and debits==2)
+i.leftGrip=false;i.rightGrip=true;step();assert(spawns==2 and debits==2)
 -- Tracking loss detaches an already primed shell; it never refunds/restarts fuse.
-i.rightGrip=true;i.rightTrigger=false;step();i.rightTrigger=true;step()
+i.leftGrip=true;i.rightGrip=false;i.rightTrigger=false;step();i.rightTrigger=true;step()
 assert(spawns==3 and G.live)
 i.active=false;step();assert(not G.live and hooks[request].pre({[2]=raw.equipment})==nil)
 assert(spawns==3 and debits==3)
 sdk,thread,vrmod,Vector3f,Vector4f=oldsdk,oldthread,oldvr,oldvector,oldvector4
-print('PASS live native grenade: trigger spawn/debit, held shell follows hand, same-shell velocity release, lifecycle/standby without duplicate')
+print('PASS LEFT-grip native grenade: trigger spawn/debit, held shell follows hand, same-shell velocity release, lifecycle/standby without duplicate')
 end

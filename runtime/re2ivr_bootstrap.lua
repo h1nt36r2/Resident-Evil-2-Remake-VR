@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.8.5"
+local VERSION="0.8.6"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -54,8 +54,8 @@ end
 settings.reloadRevision=2
 if type(loaded)~='table' or loaded.beltRevision~=1 then settings.physicalReload=false;settings.nativeControls=false;settings.beltVisible=true end
 settings.beltRevision=1
-if type(loaded)~='table' or loaded.grenadeInputRevision~=2 then settings.physicalGrenades=true end
-settings.grenadeInputRevision=2
+if type(loaded)~='table' or loaded.grenadeInputRevision~=3 then settings.physicalGrenades=true end
+settings.grenadeInputRevision=3
 local engine,current,input,state,err,ready
 local gear={}
 local controls=Controls.new(settings)
@@ -104,7 +104,7 @@ local function refresh_scene()
     if sceneEpoch~=Native.sceneEpoch then
         sceneEpoch=Native.sceneEpoch
         engine:reset_session();Grenade.reset_session()
-        gear={};pendingBeltDraw=nil;Quickslots.last=true;frames=0
+        gear={};pendingBeltDraw=nil;Quickslots.last=true;Quickslots.lastLeft=true;frames=0
         -- Height bias ownership remains with Controls; never accumulate a new offset on scene load.
         stereoStatus={status='scene_changed',sceneEpoch=sceneEpoch}
     end
@@ -155,12 +155,12 @@ re.on_pre_application_entry("UpdateBehavior",function()
         Native.control(immersive or false)
         for _,event in ipairs(Native.drain_events()) do engine:spent(event.key,event.profile or (state and state.profile)) end
         local oldStage,oldPlace=engine.stage,engine.place
-        if current and (frames%30==0 or (input.rightGrip and not Quickslots.last)) then
+        if current and (frames%30==0 or (input.rightGrip and not Quickslots.last) or (input.leftGrip and not Quickslots.lastLeft)) then
             local gear_ok,items=pcall(Inventory.read,settings.visualBindings,settings.profiles)
             if gear_ok then gear=items else gear={} end
         end
         -- Check belt pickups before grip-anywhere consumes the press as a gun draw.
-        local picked,pick_error,pick_kind,pick_wt,consumed=pcall(Quickslots.step,input,current,gear,engine,Native.select_subweapon,Native.select_mainweapon,Native.select_shortcut)
+        local picked,pick_error,pick_kind,pick_wt,consumed=pcall(Quickslots.step,input,current,gear,engine,Native.select_subweapon,Native.select_mainweapon,Native.select_shortcut,Grenade.is_live())
         if not picked then Quickslots.message='Belt selection failed: '..tostring(pick_error);consumed=true end
         if picked and pick_error then
             if pick_kind=='pistol' then pendingBeltDraw=BeltDraw.begin(pick_wt,now,sceneEpoch)
@@ -175,7 +175,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
             if not pendingBeltDraw.drawRequested then pendingBeltDraw.drawRequested=Native.draw_selected(pendingBeltDraw.wt) end
             if not state then pendingBeltDraw=nil end -- native-only weapon: draw confirmed, no physical profile needed
         end
-        if Grenade.is_live() then engine:reset('Live grenade held: release right grip')
+        if Grenade.is_live() then engine:reset('Live grenade held: release LEFT grip')
         elseif settings.nativeControls then engine:reset('Native shooting/reloading recovery mode')
         elseif picked and pick_error then
             engine:reset('Belt item selected');VR.pulse(false)
@@ -257,7 +257,7 @@ re.on_draw_ui(function()
     imgui.text('Mouse clicks at current desktop cursor: place it on OK in SteamVR Desktop, then close dashboard.')
     if imgui.button('Refresh input helper status') then Presentation.helper_status() end
     imgui.text('RE NET: Main menu > Options > RE NET > Play Data Settings > Off.')
-    imgui.text('Grenade: RIGHT grip at pouch, RIGHT trigger primes, release RIGHT grip to throw.')
+    imgui.text('Subweapon: grip an icon to select; hold LEFT grip to draw. Grenade: RIGHT trigger primes, release LEFT grip to throw.')
     imgui.text('Physical grenades: '..tostring(Grenade.status))
     if imgui.button(settings.physicalGrenades and 'Use native grenade trigger' or 'Use grenade trigger pin and physical release') then
         settings.physicalGrenades=not settings.physicalGrenades;Grenade.stop();json.dump_file('re2ivr_mvp_settings.json',settings)

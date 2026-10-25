@@ -35,6 +35,10 @@ local fieldSlot={get_type_definition=function()return {get_methods=function()ret
 assert(E.parts(fieldSlot)==11,'Typed parts field supported')
 local ambiguous={get_type_definition=function()return {get_methods=function()return {}end,get_fields=function()return {field,field}end}end}
 assert(E.parts(ambiguous)==nil,'Ambiguous fields rejected')
+local beforeChanges,beforeDraws=#changes,drawn
+api.equipSlot.call=function()equipped=equipped+1;return true end
+assert(E.apply(unknown,3,inv,eq,api,200,true,false,true),'Icon selects even without a parts getter')
+assert(#changes==beforeChanges and drawn==beforeDraws,'Icon selection must not force a draw or weapon change')
 sdk=oldsdk
 print('PASS main/sub native equip: reflected category/parts, asynchronous change, selected redraw, refusal and typed-field fallback')
 end
