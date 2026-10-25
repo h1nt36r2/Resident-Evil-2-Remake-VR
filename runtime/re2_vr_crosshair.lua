@@ -220,6 +220,47 @@ local function update_muzzle_data()
     end
 end
 
+
+-- Ada keeps native gameplay input. Only the visual marker follows the equipped
+-- object's world-space muzzle; never fall back to the HMD or a previous gun.
+local story_aim_ready = false
+local function update_story_aim()
+    story_aim_ready = false
+    re2.crosshair_pos = nil
+    local ok = pcall(function()
+        local weapon = re2.weapon
+        if not weapon then return end
+        local joint = weapon:get_field("<MuzzleJoint>k__BackingField")
+        if joint then joint = joint:get_field("_Parent") end
+        local go = weapon:call("get_GameObject")
+        local transform = go and gameobject_get_transform(go)
+        if not joint and transform then
+            joint = transform_get_joint_by_hash(transform, vfx_muzzle1_hash)
+                or transform_get_joint_by_hash(transform, vfx_muzzle2_hash)
+        end
+        local origin, direction
+        if joint then
+            origin = joint_get_position(joint)
+            direction = joint:call("get_AxisZ")
+        elseif transform then
+            -- EMF may have no bullet parameters or muzzle joint.
+            local mat = transform:call("get_WorldMatrix")
+            if mat then origin = mat[3]; direction = mat[2] end
+        end
+        if not origin or not direction then return end
+        direction = direction:normalized()
+        if direction.x ~= direction.x or direction.y ~= direction.y or direction.z ~= direction.z then return end
+        if direction.x*direction.x + direction.y*direction.y + direction.z*direction.z < 0.9 then return end
+        re2.crosshair_dir = direction
+        -- This is an aiming reference, not a hack target or hit confirmation.
+        -- No bullet raycast: EMF can interact with wiring behind solid surfaces.
+        re2.crosshair_distance = 2.0
+        re2.crosshair_pos = origin + direction * re2.crosshair_distance
+        story_aim_ready = true
+    end)
+    if not ok then story_aim_ready = false; re2.crosshair_pos = nil end
+end
+
 local reticle_names = {
     "GUI_Reticle"
 }
@@ -236,7 +277,12 @@ re.on_draw_ui(function()
 end)
 
 re.on_application_entry("LockScene", function()
-    if re2ivr_story.native then return end -- EMF is not a bullet raycast target
+    if re2ivr_story.native then
+        story_aim_ready = false
+        if not vrmod:is_hmd_active() or not vrmod:is_using_controllers() then return end
+        update_story_aim()
+        return
+    end
     if not vrmod:is_hmd_active() then return end
     local disable_crosshair = cfg.default_crosshair_behavior or 
                               cfg.disable_crosshair or 
@@ -253,7 +299,6 @@ re.on_application_entry("LockScene", function()
 end)
 
 re.on_pre_gui_draw_element(function(element, context)
-    if re2ivr_story.native then return true end -- preserve the native EMF reticle
     if not vrmod:is_hmd_active() then return true end
 
     local game_object = element:call("get_GameObject")
@@ -263,7 +308,7 @@ re.on_pre_gui_draw_element(function(element, context)
 
     --log.info("drawing element: " .. name)
 
-    if reticle_names[name] then
+    if reticle_names[name] and not re2ivr_story.native then
         if cfg.default_crosshair_behavior then
             return not cfg.disable_crosshair
         end
@@ -275,6 +320,13 @@ re.on_pre_gui_draw_element(function(element, context)
         if firstpersonmod:will_be_used() and cfg.disable_crosshair_firstperson then
             return false
         end
+    end
+
+    if re2ivr_story.native and reticle_names[name] then
+        -- Unsupported transforms/tracking loss must not show a misleading
+        -- head-centred or stale marker. Other EMF UI elements are untouched.
+        if not story_aim_ready or not vrmod:is_using_controllers()
+            or (tdb_version ~= 66 and tdb_version ~= 67 and tdb_version ~= 70) then return false end
     end
 
     -- set the world position of the crosshair/reticle to the trace end position

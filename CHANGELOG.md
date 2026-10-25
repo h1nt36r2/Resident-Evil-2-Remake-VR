@@ -1,3 +1,10 @@
+# 0.8.4
+
+- Ada: visual reticle follows equipped object muzzle/world axis instead of head-centred native GUI.
+- Native EMF input/target activation retained; no physics query or camera fallback in story reticle.
+- Added Lua regression checks to build and release workflows; release waits for Lua tests.
+- Story marker uses a fixed 2 m reference distance, not a target/hit indicator. Hardware validation pending.
+
 # 0.8.3
 
 - Единая полная сборка с обычным номером версии вместо суффикса ada-fix.

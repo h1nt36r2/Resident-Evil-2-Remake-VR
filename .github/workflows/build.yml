@@ -25,3 +25,17 @@ jobs:
           name: RE2IVR-Windows-package
           path: dist/*.zip
           if-no-files-found: error
+
+  lua:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install Lua test runtime
+        run: sudo apt-get update && sudo apt-get install -y liblua5.3-0
+      - name: Run Lua syntax and interaction fixtures
+        env:
+          LUA_DLL: /usr/lib/x86_64-linux-gnu/liblua5.3.so.0
+        run: python tests/run_lua.py
