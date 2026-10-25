@@ -29,4 +29,5 @@ function S.read(inv)
     end
     S.status='Live shortcut assignments read';return out
 end
+function S.direction(name)return resolve()[name]end
 return S

@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.8.0-quickslots"
+local VERSION="0.8.1-menu-input"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -17,6 +17,7 @@ local Quickslots=require('re2ivr.quickslots')
 local Belt=require('re2ivr.belt')
 local Grenade=require('re2ivr.grenade_native')
 local Menu=require('re2ivr.menu')
+local MenuControls=require('re2ivr.menu_controls_native')
 local settings={enabled=true,visuals=true,physicalGrenades=true,nativeHolsterModels=true,nativeGrenadeModels=true,cleanStereo=false,visualBindings={},profiles={["1"]="magazine"},hipX=.23,hipY=-.70,hipZ=.04,pouchX=-.23,pouchY=-.62,pouchZ=-.03,
     quickDraw=true,nativeControls=false,physicalReload=false,beltVisible=true,beltForward=.03,heightOffset=0,recenterMode='both',recenterBind='right_stick',recenterHold=1}
 local settings_ok,loaded=pcall(json.load_file,"re2ivr_mvp_settings.json")
@@ -108,6 +109,10 @@ re.on_pre_application_entry("UpdateBehavior",function()
     -- Must run before the weapon adapter, including title-screen/network dialogs.
     local dialog_ok,dialog_error=pcall(Presentation.tick,os.clock())
     if not dialog_ok then Presentation.message="Dialog helper unavailable: "..tostring(dialog_error) end
+    if settings.enabled then
+        local menu_ok,menu_error=pcall(MenuControls.tick)
+        if not menu_ok then MenuControls.error=tostring(menu_error);MenuControls.status='Menu input paused: '..MenuControls.error end
+    end
     if not ready then return end
     local ok,why=pcall(function()
         local now=os.clock()
@@ -203,7 +208,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
                 ammoFault=current and Native.faults[Native.key(current)] or nil,quickDraw=settings.quickDraw,nativeControls=settings.nativeControls,
                 safe=current and current.safe,reasons=current and current.reasons,weaponName=current and current.name,
                 input={rightGrip=input.rightGrip,leftGrip=input.leftGrip},snapshotAvailable=state~=nil,
-                beltSelection=Quickslots.message,shortcutStatus=require('re2ivr.shortcuts').status,beltSubWeapon=Native.beltSub,beltHold=Native.beltHold})
+                beltSelection=Quickslots.message,shortcutStatus=require('re2ivr.shortcuts').status,beltSubWeapon=Native.beltSub,beltHold=Native.beltHold,menuControls=MenuControls.status,menuControlsError=MenuControls.error})
         end
     end)
     if not ok then
