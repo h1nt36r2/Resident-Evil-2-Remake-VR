@@ -68,3 +68,18 @@ do
  assert(#chosen==2)
 end
 print('PASS subweapon icon selection with either grip; left grip elsewhere holds without selecting, live grenade blocks reselection')
+
+do
+ -- New shoulder capsule accepts reaching above the shoulder with the same DOWN mapping.
+ raw.safe=true;raw.isDevice=nil;raw.storyNative=nil
+ i.leftGrip=false;i.left=v(2,1,0);i.right=v(.20,1.76,.10);i.rightGrip=false
+ Q.step(i,raw,{},engine,nil,nil,function()error('Release cannot select')end)
+ i.rightGrip=true
+ local called
+ local ok=Q.step(i,raw,{},engine,nil,nil,function(direction)called=direction;return true,'selected',82 end)
+ assert(ok and called=='down','Over-shoulder reach must select DOWN')
+ i.right=v(.85,1.76,.10);i.rightGrip=false;Q.step(i,raw,{},engine)
+ i.rightGrip=true
+ Q.step(i,raw,{},engine,nil,nil,function()error('Distant hand cannot grab shoulder slot')end)
+end
+print('PASS shoulder capsule: over-shoulder DOWN selection and lateral-distance rejection')

@@ -39,6 +39,17 @@ local beforeChanges,beforeDraws=#changes,drawn
 api.equipSlot.call=function()equipped=equipped+1;return true end
 assert(E.apply(unknown,3,inv,eq,api,200,true,false,true),'Icon selects even without a parts getter')
 assert(#changes==beforeChanges and drawn==beforeDraws,'Icon selection must not force a draw or weapon change')
+local scalarGetter={get_name=function()return 'get_WeaponParts'end,get_param_types=function()return {}end,
+get_return_type=function()return {get_full_name=function()return 'System.Int32'end}end,call=function()return 3 end}
+local parent={get_methods=function()return {scalarGetter}end,get_fields=function()return {}end}
+local inherited={get_type_definition=function()return {
+get_methods=function()return {}end,get_fields=function()return {}end,get_parent_type=function()return parent end}end}
+assert(E.parts(inherited)==3,'Inherited integer-valued parts getter must be supported')
+assert(E.parts(unknown,inherited)==3,'Weapon object can supply parts absent on inventory slot')
+inv.call=function(_,name)assert(name=='get_MainSlot');return slot end
+api.equipSlot.call=function()return false end
+currentType=12
+assert(E.apply(slot,3,inv,eq,api,12,false,false),'Already selected main slot must not fail idempotent equip')
 sdk=oldsdk
 print('PASS main/sub native equip: reflected category/parts, asynchronous change, selected redraw, refusal and typed-field fallback')
 end

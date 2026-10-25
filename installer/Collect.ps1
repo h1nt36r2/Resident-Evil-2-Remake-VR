@@ -8,7 +8,7 @@ try {
     if(Test-Path -LiteralPath $out) {throw 'Report archive already exists. Try again in a moment.'}
     $zip=[IO.Compression.ZipFile]::Open($out,[IO.Compression.ZipArchiveMode]::Create)
     try {
-        foreach($name in @('re2ivr_mvp_status.json','re2ivr_mvp_transaction.json','re2ivr_mvp_error.json','re2ivr_mvp_settings.json','re2ivr_presentation_status.json','re2ivr_comfort_status.json','re2ivr_stereo_check.json','re2ivr_fire_contract.json','re2ivr_ammo_fault.json','re2ivr_model_status.json','re2ivr_dialog_status.json','re2ivr_input_bridge.json','re2ivr_belt_status.json','re2ivr_belt.json','re2ivr_title_layers.json')) {
+        foreach($name in @('re2ivr_mvp_status.json','re2ivr_mvp_transaction.json','re2ivr_mvp_error.json','re2ivr_mvp_settings.json','re2ivr_presentation_status.json','re2ivr_comfort_status.json','re2ivr_stereo_check.json','re2ivr_fire_contract.json','re2ivr_ammo_fault.json','re2ivr_model_status.json','re2ivr_dialog_status.json','re2ivr_input_bridge.json','re2ivr_belt_status.json','re2ivr_belt.json','re2ivr_title_layers.json','re2ivr_shortcut_bindings.json','re2ivr_shortcut_status.json')) {
             $p=Join-Path $data $name
             if(Test-Path -LiteralPath $p) {[IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip,$p,$name)|Out-Null}
         }

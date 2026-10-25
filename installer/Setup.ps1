@@ -112,7 +112,7 @@ try {
     if(-not $FrameworkArchive) {
         [Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
         $api='https://api.github.com/repos/praydog/REFramework/releases/tags/'+$releaseTag
-        $release=Invoke-RestMethod -Uri $api -Headers @{'User-Agent'='RE2IVR-Setup/0.8.6'}
+        $release=Invoke-RestMethod -Uri $api -Headers @{'User-Agent'='RE2IVR-Setup/0.8.7'}
         $assets=@($release.assets|Where-Object {if($Branch -eq 'RT') {$_.name -eq 'RE2.zip'} else {$_.name -match '^RE2_TDB[^/]*\.zip$'}})
         if($assets.Count -ne 1) {throw 'Could not select an unambiguous official RE2 asset.'}
         $asset=$assets[0];$assetName=$asset.name

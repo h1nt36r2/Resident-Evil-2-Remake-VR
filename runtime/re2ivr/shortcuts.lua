@@ -18,7 +18,7 @@ local function resolve()
     if found.up==nil or found.down==nil then S.status='Shortcut directions unavailable: '..table.concat(names,',');return {} end
     directions=found;return found
 end
-function S.read(inv)
+function S.native_read(inv)
     local out={}
     for name,value in pairs(resolve()) do
         local slot=inv:call('getSlot('..sdk.game_namespace('EquipmentDefine.Shortcut')..')',value)
@@ -28,6 +28,15 @@ function S.read(inv)
         end
     end
     S.status='Live shortcut assignments read';return out
+end
+function S.read(inv)
+    local ok,out=pcall(S.native_read,inv)
+    if not ok then S.status='Native shortcuts unavailable: '..tostring(out);out={} end
+    local savedOK,saved=pcall(require('re2ivr.bindings').read,inv)
+    if savedOK then
+        for direction,row in pairs(saved)do out[direction]=row;S.status='Game shortcuts with saved belt overrides' end
+    end
+    return out
 end
 function S.direction(name)return resolve()[name]end
 return S

@@ -2,7 +2,6 @@
 -- native shortcut assignment API and the GUI triggers used upstream for D-pad floors.
 local N={status='Menu controls not sampled',policy=require('re2ivr.menu_controls').new()}
 local Shortcuts=require('re2ivr.shortcuts')
-local inventoryState
 local function context()
     local gui=sdk.get_managed_singleton(sdk.game_namespace('gui.GUIMaster'))
     if not gui then return nil end
@@ -11,44 +10,81 @@ local function context()
     local extraOK,extraBusy=pcall(function()return gui:call('isBusyGeneralDialogEx')end)
     if extraOK and extraBusy==true then return nil end
     if gui:call('get_IsOpenMap')==true then return 'map',gui end
-    if inventoryState==nil then
-        local t=sdk.find_type_definition(sdk.game_namespace('gui.GUIMaster.GuiState'))
-        for _,f in ipairs(t and t:get_fields() or {})do
-            if f:is_static() and f:get_name():lower()=='inventory' then inventoryState=f:get_data(nil) end
-        end
-    end
-    if inventoryState~=nil and gui:call('get_IsOpenInventory')==true and gui:call('get_State_')==inventoryState then return 'inventory',gui end
+    -- IsOpenInventory is the native semantic guard. Exact GuiState enum labels
+    -- vary between builds/subscreens and must not reject an otherwise open inventory.
+    if gui:call('get_IsOpenInventory')==true then return 'inventory',gui end
 end
-function N.assign(direction)
-    local mode=context();if mode~='inventory' then return false,'Not a regular inventory screen' end
+local Bindings=require('re2ivr.bindings')
+local function inventory()
     local manager=sdk.get_managed_singleton(sdk.game_namespace('PlayerManager'))
     local player=manager and manager:call('get_CurrentPlayer')
-    local inv=player and player:call('getComponent(System.Type)',sdk.typeof(sdk.game_namespace('survivor.Inventory')))
-    if not inv then return false,'Inventory unavailable' end
-    local slot=inv:call('get_MainSlot')
-    if not slot or slot:call('get_IsEmpty') or slot:call('get_IsDeadSlot') or not slot:call('get_IsWeapon')
-        or slot:call('get_IsSubWeapon') or not inv:call('enableSetShortcut',slot) then return false,'Equip a main weapon before assigning its shortcut' end
-    local value=Shortcuts.direction(direction)
-    if value==nil then return false,'Shortcut direction unavailable' end
-    local slots=inv:call('get_Slots');local count=slots and slots:call('get_Count') or 0
-    if count<0 or count>256 then return false,'Invalid inventory size' end
-    local index
-    for n=0,count-1 do if slots:call('get_Item(System.Int32)',n)==slot then index=n;break end end
-    if index==nil then return false,'Equipped weapon no longer in inventory' end
-    local setter
-    local invType=sdk.find_type_definition(sdk.game_namespace('survivor.Inventory'))
-    for _,m in ipairs(invType and invType:get_methods() or {}) do
-        local p=m:get_param_types()
-        if m:get_name()=='setShortcutSlot' and #p==2 and p[1]:get_full_name()=='System.Int32'
-            and p[2]:get_full_name()==sdk.game_namespace('EquipmentDefine.Shortcut')
-            and m:get_return_type():get_full_name()=='System.Boolean' then setter=m;break end
+    return player and player:call('getComponent(System.Type)',sdk.typeof(sdk.game_namespace('survivor.Inventory')))
+end
+function N.assign(direction,index)
+    local mode=context();if mode~='inventory' then return false,'Open the regular inventory first' end
+    local inv=inventory();if not inv then return false,'Inventory unavailable'end
+    local owned=Bindings.owned(inv)
+    local slot
+    if index~=nil then
+        for _,row in ipairs(owned)do if row.index==index then slot=row.slot;break end end
+    else
+        local main=inv:call('get_MainSlot')
+        for _,row in ipairs(owned)do if row.slot==main then slot=row.slot;index=row.index;break end end
     end
-    if not setter then return false,'Shortcut assignment method unavailable' end
-    local accepted=setter:call(inv,index,value)
-    if accepted~=true then return false,'Game rejected shortcut assignment' end
-    local after=Shortcuts.read(inv)[direction]
-    if not after or after.weaponType~=tostring(slot:call('get_WeaponType')) then return false,'Shortcut verification failed; not retried' end
-    return true,'Equipped weapon assigned: '..direction
+    if not slot then return false,'Choose an owned main weapon from the assignment list'end
+    local native=false
+    local nativeOK,nativeReason=pcall(function()
+        local value=Shortcuts.direction(direction)
+        if value==nil then return 'Native direction enum unavailable'end
+        local setter,reverse
+        local t=sdk.find_type_definition(sdk.game_namespace('survivor.Inventory'))
+        for _,m in ipairs(t and t:get_methods() or {})do
+            local p=m:get_param_types()
+            local ret=m:get_return_type():get_full_name()
+            if m:get_name()=='setShortcutSlot' and #p==2 and (ret=='System.Boolean' or ret=='System.Void')then
+                local a,b=p[1]:get_full_name(),p[2]:get_full_name()
+                if a=='System.Int32' and b==sdk.game_namespace('EquipmentDefine.Shortcut')then setter=m;reverse=false;break end
+                if b=='System.Int32' and a==sdk.game_namespace('EquipmentDefine.Shortcut')then setter=m;reverse=true;break end
+            end
+        end
+        if not setter then return 'Native assignment method unavailable'end
+        if reverse then setter:call(inv,value,index)else setter:call(inv,index,value)end
+        local row=Shortcuts.native_read(inv)[direction]
+        native=row~=nil and row.weaponType==tostring(slot:call('get_WeaponType'))
+        return native and 'Native assignment verified' or 'Native assignment not verified'
+    end)
+    local ok,why=Bindings.assign(inv,slot,direction,native and 'native' or 'mod')
+    N.status=why;N.policy.status=why
+    if ok then pcall(function()vrmod:apply_haptic_vibration(0,.08,80,.4,vrmod:get_left_joystick())end)end
+    pcall(function()
+        json.dump_file('re2ivr_shortcut_status.json',{schema=1,direction=direction,index=index,
+            saved=ok,nativeVerified=native,nativeReason=tostring(nativeReason),nativeCallOK=nativeOK,status=why})
+    end)
+    return ok,why
+end
+function N.ui()
+    if not imgui.tree_node('Assign weapons to quick slots')then return end
+    local mode=context()
+    if mode~='inventory'then
+        imgui.text('Open the game inventory, then open this panel.')
+    else
+        local inv=inventory()
+        local ok,rows=pcall(Bindings.owned,inv)
+        imgui.text('Select a weapon below. Down = behind RIGHT shoulder; Up = RIGHT hip.')
+        imgui.text('Native slots are verified; if rejected, the belt assignment is saved separately.')
+        if ok then
+            for _,row in ipairs(rows)do
+                imgui.text(row.name)
+                for _,direction in ipairs({'up','down','left','right'})do
+                    if imgui.button(direction..'##assign'..row.index..direction)then N.assign(direction,row.index)end
+                end
+            end
+            if imgui.button('Use game assignments again##clearBeltOverrides')then
+                N.status=Bindings.clear(inv) and 'Saved belt overrides cleared' or 'Could not clear belt overrides'
+            end
+        else imgui.text('Inventory list unavailable: '..tostring(rows))end
+    end
+    imgui.text(N.status);imgui.tree_pop()
 end
 function N.floor(direction)
     if direction~='up' and direction~='down' then return false,'Invalid map direction' end

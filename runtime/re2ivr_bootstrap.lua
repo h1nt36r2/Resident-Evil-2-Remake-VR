@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.8.6"
+local VERSION="0.8.7"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -241,6 +241,8 @@ end)
 re.on_script_reset(function() pcall(function() stop("Scripts reset") end);pcall(Models.clear);_G.RE2IVR_MVP_LOADED=nil end)
 re.on_draw_ui(function()
     imgui.text("RE2 Immersive VR "..VERSION)
+    local assignmentUIOK,assignmentUIError=pcall(MenuControls.ui)
+    if not assignmentUIOK then imgui.text('Shortcut panel unavailable: '..tostring(assignmentUIError)) end
     imgui.text('Default reload: normal game button. Physical reload is optional while belt is being developed.')
     if imgui.button(settings.physicalReload and 'Use native button reload' or 'Enable experimental physical reload') then
         settings.physicalReload=not settings.physicalReload;engine:reset('Reload mode changed');Native.stop();json.dump_file('re2ivr_mvp_settings.json',settings)

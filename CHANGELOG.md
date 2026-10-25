@@ -1,3 +1,11 @@
+# 0.8.7
+
+- Add explicit owned-weapon quickslot assignment panel in inventory; remove exact GuiState enum-name dependency.
+- Verify native assignments; persist per-character mod belt overrides when native assignment is rejected/unavailable. Do not claim native HUD changes for fallback.
+- Validate ownership at read and equip; add save rollback and return-to-game-bindings action.
+- Extend shoulder grab to an over-shoulder capsule; resolve inherited/integer parts and weapon-object fallback, accept confirmed idempotent selection.
+- Add assignment refusal/list-choice/persistence/ownership and shoulder reach regression tests. Hardware confirmation pending.
+
 # 0.8.6
 
 - Pouch grip with either hand selects a subweapon; LEFT grip holds it, release preserves selection.

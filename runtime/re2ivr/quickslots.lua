@@ -17,6 +17,14 @@ function Q.step(input,current,gear,engine,select,selectMain,selectShortcut,block
             local function check(hand)
                 if not hand then return end
                 local d=C.math.dist(hand,p)
+                if slot.kind=='back'then
+                    -- Shoulder capsule includes reaching over the shoulder, not only behind it.
+                    local upper=C.math.point(input.head,body,slot.x,.08,slot.z-.20)
+                    local ax,ay,az=upper.x-p.x,upper.y-p.y,upper.z-p.z
+                    local t=((hand.x-p.x)*ax+(hand.y-p.y)*ay+(hand.z-p.z)*az)/(ax*ax+ay*ay+az*az)
+                    t=math.max(0,math.min(1,t))
+                    d=C.math.dist(hand,{x=p.x+ax*t,y=p.y+ay*t,z=p.z+az*t})
+                end
                 if d<radius and (not distance or d<distance)then nearest=slot;distance=d end
             end
             if right then check(input.right)end
