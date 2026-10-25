@@ -28,6 +28,8 @@ function B.publish(current,input,gear,engine,settings,now)
         safe=true;for _,reason in ipairs(current.reasons) do if reason~='vanillaReload' then safe=false end end
     end
     json.dump_file('re2ivr_belt.json',{schema=1,time=os.time(),enabled=settings.beltVisible and input and input.active and safe and not current.storyNative or false,
-        slots=B.slots(current,gear,engine,settings)})
+        slots=B.slots(current,gear,engine,settings),
+        reload={enabled=settings.physicalReload and not settings.nativeControls and engine.place=='held' and safe or false,
+            stage=engine.stage,message=engine.message,round=engine.round or false,count=engine.amount or 0}})
 end
 return B

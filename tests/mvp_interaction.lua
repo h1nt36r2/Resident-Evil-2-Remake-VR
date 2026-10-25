@@ -80,3 +80,14 @@ do
  assert(not e.locked and not next(e.cycles) and not next(e.failedKeys) and not next(e.lastAmmo) and e.identity==nil and e.place=='holstered')
 end
 print("PASS magazine geometry/slide, revolver, ammo conservation, grip, scene conflict and full new-player session reset")
+
+-- Fast insertion crosses the seating plane between sampled frames.
+do
+ local a,b,c,t,n=setup();b.eject=true;t();b.eject=false;b.leftGrip=true;t()
+ b.left=C.math.add(a.well,v(0,-.09,0));t()
+ b.left=C.math.add(a.well,v(0,.11,0));t()
+ assert(a.stage=='inserted' and n()==0)
+ b.leftGrip=false;t();b.left=a.slide;b.leftGrip=true;t()
+ b.left=C.math.add(a.slide,v(.25,0,.09));t()
+ assert(a.stage=='inserted' and n()==0,'Lateral hand motion must lose slide grip')
+end

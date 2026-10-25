@@ -70,6 +70,10 @@ assert(N.beltSub==55 and N.beltHold==nil,'Release must preserve selection and st
 wt=55;activeSlot=knife;N.refresh()
 input.leftGrip=true;N.update_belt_hold(input,true)
 assert(N.beltSub==55 and N.beltHold=='held','Knife can be drawn again after grenade')
+N.update_belt_hold(input,true,true)
+assert(N.reloadPriority and not N.beltHold,'Ammo hand must not draw selected knife')
+N.update_belt_hold(input,true,false)
+assert(not N.reloadPriority and N.beltHold=='held','Subweapon hold returns after reload priority')
 currentPlayer=player();N.refresh()
 assert(N.beltSub==nil and N.beltOwner==nil,'New player clears old selection ownership')
 sdk=oldsdk;package.loaded['re2ivr.equip']=oldEquip;story.update=oldUpdate;story.native=oldNative

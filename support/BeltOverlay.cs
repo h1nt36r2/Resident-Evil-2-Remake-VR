@@ -48,6 +48,42 @@ class BeltOverlay : IDisposable {
         float dot=rx*nx+rz*nz;float ax=rx-nx*dot,ay=-ny*dot,az=rz-nz*dot;len=(float)Math.Sqrt(ax*ax+ay*ay+az*az);if(len<.01f)throw new Exception("Invalid belt basis");ax/=len;ay/=len;az/=len;
         return new HmdMatrix34_t{m0=ax,m1=ny*az-nz*ay,m2=nx,m3=px,m4=ay,m5=nz*ax-nx*az,m6=ny,m7=py,m8=az,m9=nx*ay-ny*ax,m10=nz,m11=pz};
     }
+    void Reload(Dictionary<string,object> packet,string cache,TrackedDevicePose_t[] poses){
+        const string key="reload";
+        ulong handle;
+        object obj;
+        if(!packet.TryGetValue(key,out obj)){if(handles.TryGetValue(key,out handle))overlays.HideOverlay(handle);return;}
+        var r=(Dictionary<string,object>)obj;
+        uint device=system.GetTrackedDeviceIndexForControllerRole(ETrackedControllerRole.LeftHand);
+        if(!Convert.ToBoolean(r["enabled"]) || device>=poses.Length || !poses[device].bPoseIsValid || !poses[device].bDeviceIsConnected){
+            if(handles.TryGetValue(key,out handle))overlays.HideOverlay(handle);return;
+        }
+        if(!handles.TryGetValue(key,out handle)){
+            var error=overlays.CreateOverlay("re2ivr.reload."+System.Diagnostics.Process.GetCurrentProcess().Id,"RE2IVR reload",ref handle);
+            if(error!=EVROverlayError.None)throw new Exception("Reload overlay: "+error);
+            handles[key]=handle;overlays.SetOverlayWidthInMeters(handle,.18f);
+        }
+        string stage=Convert.ToString(r["stage"]),message=Convert.ToString(r["message"]);
+        bool ammo=stage=="magazine_held" || Convert.ToBoolean(r["round"]);
+        string texture=stage+":"+message+":"+ammo;
+        if(!textures.ContainsKey(key)||textures[key]!=texture){
+            string path=Path.Combine(cache,"reload.png");
+            using(var b=new Bitmap(384,256,PixelFormat.Format32bppArgb))using(var g=Graphics.FromImage(b))
+            using(var white=new SolidBrush(Color.White))using(var metal=new SolidBrush(Color.Silver))
+            using(var dark=new SolidBrush(Color.FromArgb(220,25,30,35)))
+            using(var font=new Font(FontFamily.GenericSansSerif,18,FontStyle.Bold)){
+                g.Clear(Color.Transparent);g.FillRectangle(dark,0,0,384,256);
+                if(ammo){g.FillRectangle(metal,155,10,60,90);g.DrawRectangle(Pens.Black,164,20,42,70);}
+                g.DrawString(message,font,white,new RectangleF(10,ammo?110:15,364,130));b.Save(path,ImageFormat.Png);
+            }
+            var error=overlays.SetOverlayFromFile(handle,path);if(error!=EVROverlayError.None)throw new Exception("Reload texture: "+error);
+            textures[key]=texture;
+        }
+        var m=new HmdMatrix34_t{m0=1,m5=1,m10=1,m7=.08f,m11=-.06f};
+        var transform=overlays.SetOverlayTransformTrackedDeviceRelative(handle,device,ref m);
+        if(transform!=EVROverlayError.None)throw new Exception("Reload transform: "+transform);
+        overlays.ShowOverlay(handle);
+    }
     void Status(string status){try{File.WriteAllText(Path.Combine(data,"re2ivr_belt_status.json"),json.Serialize(new{schema=1,time=Now(),status=status}));}catch{}}
     void Hide(){if(overlays!=null)foreach(ulong h in handles.Values)overlays.HideOverlay(h);}
     void Run(){
@@ -85,6 +121,7 @@ class BeltOverlay : IDisposable {
                         var showError=overlays.ShowOverlay(handle);
                         if(transformError!=EVROverlayError.None || showError!=EVROverlayError.None)throw new Exception("Overlay transform/show rejected");
                     }
+                    Reload(packet,cache,poses);
                     if(Now()!=statusAt){Status("SteamVR belt active: "+handles.Count+" spatial icon overlays");statusAt=Now();}
                 }catch(Exception e){Hide();Status("Belt suspended: "+e.Message);Thread.Sleep(500);}
                 Thread.Sleep(50);

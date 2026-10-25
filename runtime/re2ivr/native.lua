@@ -335,14 +335,15 @@ function N.select_shortcut(direction)
     local selected,why=select_owned(wt,row.sub)
     return selected,why,wt
 end
-function N.update_belt_hold(input,allowed)
+function N.update_belt_hold(input,allowed,reloadPriority)
+    N.reloadPriority=allowed and reloadPriority and not Story.native and input and input.active and current and not current.isDevice or false
     if not allowed or Story.native or not input or not input.active or not current or current.isDevice or N.beltOwner~=current.equipment then
         N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil;return
     end
     if not N.beltSub then return end
     -- Pouch grip chooses; LEFT grip holds the chosen native subweapon.
     -- Releasing it clears only hold interception, not the inventory selection.
-    N.beltHold=input.leftGrip and 'held' or nil
+    N.beltHold=not N.reloadPriority and input.leftGrip and 'held' or nil
 end
 function N.scene_safe()
     if N.readError then return false end
@@ -367,7 +368,7 @@ function N.visible(value)
     if not value then api.draw:call(current.weapon,false);hidden=current.weapon
     elseif hidden==current.weapon then api.draw:call(current.weapon,true);hidden=nil end
 end
-function N.stop() enabled=false;N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil;N.visible(true) end
+function N.stop() enabled=false;N.reloadPriority=false;N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil;N.visible(true) end
 function N.commit(expected,n)
     local before=read()
     assert(enabled and not Story.native and before and not before.isDevice and before.safe and same(before,expected),"Native snapshot changed")
