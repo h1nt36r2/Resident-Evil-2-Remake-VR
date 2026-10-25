@@ -45,7 +45,7 @@ sdk={game_namespace=function(n)return n end,get_tdb_version=function()return 70 
  find_type_definition=function(t)return {get_method=function(_,name)
   return method(function(obj,...)
    if name=='calc32' then return 0 end
-   if name=='get_Transform' then return source.missing and nil or transform end
+   if name=='get_Transform' then if source.missing then return nil end; return transform end
    if name=='getJointByHash' then return nil end
    if name=='get_Position' then return source.origin end
    error('Unexpected method '..name)

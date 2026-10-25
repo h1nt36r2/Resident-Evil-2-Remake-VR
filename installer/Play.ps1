@@ -5,6 +5,10 @@ try {
     if(-not(Test-Path -LiteralPath $location)) {throw 'Run Install.cmd first.'}
     $helper=Join-Path $PSScriptRoot 'RE2IVR-DialogInput.exe'
     $target=([IO.Path]::GetFullPath((Get-Content -Raw -LiteralPath $location|ConvertFrom-Json).gamePath)).TrimEnd('\')
+    if(-not $HelperOnly -and -not(Get-Process -Name re2 -ErrorAction SilentlyContinue)) {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Apply-Stereo.ps1') -GamePath $target
+        if($LASTEXITCODE -ne 0) {throw 'Stereo compatibility profile failed.'}
+    }
     # Replace only a previous instance of our helper configured for this exact game.
     # Otherwise the older per-game mutex can keep the new belt helper from starting.
     foreach($process in @(Get-CimInstance Win32_Process -Filter "Name='RE2IVR-DialogInput.exe'" -ErrorAction SilentlyContinue)) {

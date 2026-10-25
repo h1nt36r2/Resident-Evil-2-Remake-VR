@@ -53,6 +53,8 @@ end
 settings.reloadRevision=2
 if type(loaded)~='table' or loaded.beltRevision~=1 then settings.physicalReload=false;settings.nativeControls=false;settings.beltVisible=true end
 settings.beltRevision=1
+if type(loaded)~='table' or loaded.grenadeInputRevision~=2 then settings.physicalGrenades=true end
+settings.grenadeInputRevision=2
 local engine,current,input,state,err,ready
 local gear={}
 local controls=Controls.new(settings)
@@ -133,7 +135,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
         tracking=true
         refresh_scene()
         Native.update_belt_hold(input,settings.enabled and not settings.nativeControls)
-        local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls and not Story.native)
+        local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls and not Story.native,{player=Native.observedPlayer,safe=Native.scene_safe(true)})
         if not grenadeOK then Grenade.locked=true;Grenade.stop();Grenade.status=tostring(grenadeError) end
         if Inventory.learn(current,settings.visualBindings) then gear={};json.dump_file("re2ivr_mvp_settings.json",settings) end
         local dt=math.min(math.max(now-last,.001),.1);last=now
@@ -147,12 +149,12 @@ re.on_pre_application_entry("UpdateBehavior",function()
         local nativeOverride=current and settings.profiles[tostring(current.wt)]=='native'
         -- A supported name alone cannot establish a working immersive input/ammo contract.
         -- Incomplete snapshots and desktop/menu sessions keep the original game's controls.
-        local immersive=not settings.nativeControls and not nativeOverride and input.active and state~=nil
+        local immersive=not settings.nativeControls and not nativeOverride and input.active and state~=nil and not Grenade.is_live()
         -- Preserve the game's genuine bonus weapons; never set Infinity on regular weapons.
         Native.control(immersive or false)
         for _,event in ipairs(Native.drain_events()) do engine:spent(event.key,event.profile or (state and state.profile)) end
         local oldStage,oldPlace=engine.stage,engine.place
-        if current and frames%30==0 then
+        if current and (frames%30==0 or (input.rightGrip and not Quickslots.last)) then
             local gear_ok,items=pcall(Inventory.read,settings.visualBindings,settings.profiles)
             if gear_ok then gear=items else gear={} end
         end
@@ -166,7 +168,8 @@ re.on_pre_application_entry("UpdateBehavior",function()
         end
         Native.update_belt_hold(input,settings.enabled and not settings.nativeControls)
         if pendingBeltDraw and (not input.rightGrip or now>pendingBeltDraw.expires)then pendingBeltDraw=nil end
-        if settings.nativeControls then engine:reset('Native shooting/reloading recovery mode')
+        if Grenade.is_live() then engine:reset('Live grenade held: release right grip')
+        elseif settings.nativeControls then engine:reset('Native shooting/reloading recovery mode')
         elseif picked and pick_error then
             engine:reset('Belt item selected');VR.pulse(false)
             if pick_kind=='pistol' and state and current.safe and tostring(current.wt)==tostring(pick_wt) then
@@ -245,8 +248,9 @@ re.on_draw_ui(function()
     imgui.text('Mouse clicks at current desktop cursor: place it on OK in SteamVR Desktop, then close dashboard.')
     if imgui.button('Refresh input helper status') then Presentation.helper_status() end
     imgui.text('RE NET: Main menu > Options > RE NET > Play Data Settings > Off.')
+    imgui.text('Grenade: RIGHT grip at pouch, RIGHT trigger primes, release RIGHT grip to throw.')
     imgui.text('Physical grenades: '..tostring(Grenade.status))
-    if imgui.button(settings.physicalGrenades and 'Use native grenade trigger' or 'Use physical grenade pin and release') then
+    if imgui.button(settings.physicalGrenades and 'Use native grenade trigger' or 'Use grenade trigger pin and physical release') then
         settings.physicalGrenades=not settings.physicalGrenades;Grenade.stop();json.dump_file('re2ivr_mvp_settings.json',settings)
     end
     if imgui.tree_node('Title background recovery') then Menu.ui();imgui.tree_pop() end
@@ -271,7 +275,7 @@ re.on_draw_ui(function()
         settings.quickDraw=not settings.quickDraw;json.dump_file('re2ivr_mvp_settings.json',settings)
     end
     imgui.text('Quick draw default: release RIGHT grip, then squeeze anywhere to hold weapon.')
-    imgui.text('RT one-eye body bug: try another costume, or Steam non-RT branch. See VR-TROUBLESHOOTING.md.')
+    imgui.text('RT stereo: Play.cmd applies automatic AFR workaround; headset confirmation pending. Restore-Stereo.cmd reverts it.')
     imgui.text('Stability: SteamVR per-application RE2 resolution 100%. Do not raise supersampling during crash recovery.')
     imgui.text('Walk: left stick. Sprint: click LEFT stick (native RE2 running mode).')
     imgui.text('Recenter: '..settings.recenterBind..', hold '..settings.recenterHold..' s while sticks are neutral.')

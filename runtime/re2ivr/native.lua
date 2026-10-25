@@ -306,8 +306,10 @@ local function select_owned(wt,sub)
             and (slot:call('get_IsSubWeapon')==true)==sub and slot:call('get_WeaponType')==wt then
             -- Let Inventory update its MainSlot/SubSlot and equipment events together.
             -- Direct Equipment.changeWeapon alone can leave the inventory's sub-slot unchanged.
-            if current.slot~=slot and api.equipSlot:call(inv,n)~=true then return false,'Native inventory refused belt item' end
-            if sub then N.beltSub=wt;N.beltOwner=current.equipment else N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil end
+            if sub and (type(slot:call('get_Number'))~='number' or slot:call('get_Number')<1) then return false,'Pouch item depleted' end
+            local accepted,message=require('re2ivr.equip').apply(slot,n,inv,current.equipment,api,wt,sub,current.slot==slot)
+            if not accepted then return false,message end
+            if sub then N.beltSub=wt;N.beltHold='held';N.beltOwner=current.equipment else N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil end
             return true,'Native belt equip requested'
         end
     end

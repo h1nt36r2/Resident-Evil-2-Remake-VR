@@ -1,3 +1,9 @@
+# 0.8.4 additions
+
+- Grenade input: grip pouch, right trigger primes a native live shell, release grip throws the same shell; one debit at priming.
+- Complete subweapon draw using reflected parts, refresh inventory on grip, remove stale held-state pouch block.
+- Automatic backed-up AFR workaround for RT body visibility; hardware confirmation pending. Restore-Stereo.cmd reverts only AFR.
+
 # 0.8.4
 
 - Ada: visual reticle follows equipped object muzzle/world axis instead of head-centred native GUI.

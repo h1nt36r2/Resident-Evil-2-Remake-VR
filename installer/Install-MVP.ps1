@@ -23,6 +23,8 @@ try {
         else {$text+="`r`n$key=$value`r`n"}
     }
     [IO.File]::WriteAllText($config,$text,(New-Object Text.UTF8Encoding($false)))
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'Apply-Stereo.ps1') -GamePath $location.gamePath
+    if($LASTEXITCODE -ne 0) {throw 'Stereo compatibility profile failed.'}
     Write-Output 'Installed. Game graphics preserved. Start SteamVR, then Play.cmd for spatial belt. Repair-SteamVR.cmd is optional.'
     exit 0
 } catch {Write-Error $_;exit 1}

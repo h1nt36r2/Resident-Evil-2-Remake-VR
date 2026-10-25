@@ -57,3 +57,5 @@ jobs:
         env:
           LUA_DLL: /usr/lib/x86_64-linux-gnu/liblua5.3.so.0
         run: python tests/run_lua.py
+
+# 0.8.4 publication includes grip/trigger live grenades and backed-up RT stereo profile.

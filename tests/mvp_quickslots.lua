@@ -9,9 +9,9 @@ local function select(wt)assert(wt==200);calls=calls+1;return true,'equipped' en
 Q.step(i,raw,gear,engine,select);i.rightGrip=true;assert(Q.step(i,raw,gear,engine,select))
 for _=1,10 do assert(not Q.step(i,raw,gear,engine,select)) end;assert(calls==1)
 i.rightGrip=false;Q.step(i,raw,gear,engine,select);engine.place='held';i.rightGrip=true
-assert(not Q.step(i,raw,gear,engine,select) and calls==1)
+assert(Q.step(i,raw,gear,engine,select) and calls==2)
 i.rightGrip=false;Q.step(i,raw,gear,engine,select);engine.place='holstered';i.rightGrip=true
-assert(not Q.step(i,raw,{},engine,select) and calls==1)
+assert(not Q.step(i,raw,{},engine,select) and calls==2)
 raw.safe=false;assert(not Q.step(i,raw,gear,engine,select))
 raw.safe=true;i.rightGrip=false;i.right=v(-.34,1.08,-.12)
 local knife={{weaponType='300',kind='knife',sub=true,count=1}}
