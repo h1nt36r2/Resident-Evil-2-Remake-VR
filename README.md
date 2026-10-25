@@ -1,6 +1,6 @@
-# Resident Evil 2 Remake VR Mod — RE2 Immersive VR
+# RE2 VR — Resident Evil 2 Remake VR Mod
 
-**An open-source PCVR mod for Resident Evil 2 Remake (2019), built on REFramework, targeting Meta Quest 3 through SteamVR / OpenVR. Includes motion-controller weapon handling, spatial inventory belt, a Windows installer and experimental physical reload mechanics.**
+**RE2 VR / RE2 Remake VR (RE2IVR) is an open-source PCVR mod for Resident Evil 2 Remake (2019), built on REFramework, targeting Meta Quest 3 through SteamVR / OpenVR. Includes motion-controller weapon handling, spatial inventory belt, a Windows installer and experimental physical reload mechanics.**
 
 **VR-мод для Resident Evil 2 Remake:** оружие и предметы с VR-контроллеров, пояс с кобурой и установка одним действием.
 
