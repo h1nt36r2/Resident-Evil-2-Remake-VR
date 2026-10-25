@@ -45,9 +45,9 @@ end
 function use.execute(_,wt,n)assert(wt==50 and n==1);debits=debits+1;count=count-1 end
 local G=require('re2ivr.grenade_native');G.init();assert(G.ready,G.status)
 local v=require('re2ivr.interaction').math.v
-local i={active=true,rightGrip=false,leftGrip=false,right=v(0,1,0),left=v(0,1,0),rightVelocity=v(2,1,-3),rightAngular=v(0,0,1)}
+local i={active=true,rightGrip=true,leftGrip=false,right=v(0,1,0),left=v(0,1,0),rightVelocity=v(2,1,-3),rightAngular=v(0,0,1)}
 local function step()G.step(i,raw,true)end
-step();i.rightGrip=true;step()
+G.begin_pickup(50);step();assert(G.gesture.stage=='held','Belt grip must transfer into held grenade without re-gripping')
 assert(hooks[request].pre({[2]=raw.equipment})=='skip')
 assert(hooks[fire].pre({[2]=raw.equipment,[3]=50})=='skip')
 assert(hooks[fire].post(1)==0)

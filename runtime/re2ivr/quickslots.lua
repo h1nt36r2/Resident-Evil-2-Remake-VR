@@ -1,32 +1,37 @@
 local C=require('re2ivr.interaction')
 local Q={last=true,message='',requests=0}
 local Belt=require('re2ivr.belt')
-function Q.step(input,current,gear,engine,select,selectMain)
+function Q.step(input,current,gear,engine,select,selectMain,selectShortcut)
     if not input or not input.active or not current or not current.safe then Q.last=true;return false end
     local pressed=input.rightGrip and not Q.last;Q.last=input.rightGrip
     if not pressed or engine.place=='held' then return false end
     local _,_,body=C.anchors(input,engine.o)
-    if selectMain then
-        local slot=Belt.slots(current,gear,engine,engine.o)[1]
-        if slot.weaponType and slot.weaponType~=tostring(current.wt) then
+    -- Choose the closest physical zone FIRST, including empty zones. An empty pouch
+    -- must consume this grip instead of falling through to grip-anywhere pistol draw.
+    local nearest,distance
+    for _,slot in ipairs(Belt.slots(current,gear,engine,engine.o)) do
+        if slot.kind~='ammo' then
             local p=C.math.point(input.head,body,slot.x,slot.y,slot.z)
-            if C.math.dist(input.right,p)<.14 then
-                local ok,why=selectMain(tonumber(slot.weaponType));Q.message=why or ''
-                if ok then Q.requests=Q.requests+1;return true,'pistol',slot.weaponType end
-                return false
-            end
+            local radius=slot.kind=='back' and .23 or (slot.kind=='pistol' and .20 or .14)
+            local d=C.math.dist(input.right,p)
+            if d<radius and (not distance or d<distance) then nearest=slot;distance=d end
         end
     end
-    for _,row in ipairs(gear or {}) do
-        if row.sub and Belt.layout[row.kind] and row.weaponType~=tostring(current.wt) then
-            local a=Belt.layout[row.kind];local p=C.math.point(input.head,body,a[1],a[2],a[3]-(engine.o.beltForward or 0))
-            if C.math.dist(input.right,p)<.11 then
-                local wt=tonumber(row.weaponType);if not wt then return false end
-                local ok,why=select(wt);Q.message=why or ''
-                if ok then Q.requests=Q.requests+1;return true,row.kind,row.weaponType end
-                return false
-            end
+    if nearest then
+        local ok,why,wt
+        if nearest.shortcut and selectShortcut then
+            ok,why,wt=selectShortcut(nearest.shortcut)
+        elseif nearest.weaponType then
+            wt=tonumber(nearest.weaponType)
+            local action=nearest.kind=='pistol' and selectMain or select
+            if action and wt then ok,why=action(wt) end
         end
+        Q.message=why or (nearest.shortcut and 'Shortcut slot empty/unavailable' or 'Pouch empty/unavailable')
+        if ok then
+            Q.requests=Q.requests+1
+            return true,nearest.shortcut and 'pistol' or nearest.kind,tostring(wt or nearest.weaponType),true
+        end
+        return false,nil,nil,true
     end
     return false
 end

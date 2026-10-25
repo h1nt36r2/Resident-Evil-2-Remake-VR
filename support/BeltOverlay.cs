@@ -16,7 +16,7 @@ class BeltOverlay : IDisposable {
     readonly Dictionary<string,ulong> handles=new Dictionary<string,ulong>();
     readonly Dictionary<string,string> textures=new Dictionary<string,string>();
     volatile bool stop;Thread thread;CVRSystem system;CVROverlay overlays;
-    static readonly string[] kinds={"pistol","knife","grenade","flash","ammo"};
+    static readonly string[] kinds={"pistol","knife","grenade","flash","ammo","back"};
     static long Now(){return (long)(DateTime.UtcNow-new DateTime(1970,1,1)).TotalSeconds;}
     public BeltOverlay(string data,string game){this.data=data;this.game=game;thread=new Thread(Run);thread.IsBackground=true;thread.Start();}
     static float F(Dictionary<string,object> d,string k){float v=Convert.ToSingle(d[k]);if(float.IsNaN(v)||float.IsInfinity(v)||Math.Abs(v)>2)throw new Exception("Invalid belt coordinate");return v;}
@@ -29,7 +29,7 @@ class BeltOverlay : IDisposable {
             g.SmoothingMode=SmoothingMode.AntiAlias;g.Clear(Color.Transparent);
             using(var p=Rounded(8,52,176,195,34)){g.FillPath(leather,p);g.DrawPath(pen,p);}
             if(count>0 && !held){
-                if(kind=="pistol"){g.FillRectangle(metal,39,34,117,29);g.FillPolygon(metal,new[]{new Point(100,58),new Point(139,58),new Point(132,147),new Point(94,145)});g.DrawRectangle(pen,59,65,43,35);}
+                if(kind=="pistol"||kind=="back"){g.FillRectangle(metal,39,34,117,29);g.FillPolygon(metal,new[]{new Point(100,58),new Point(139,58),new Point(132,147),new Point(94,145)});g.DrawRectangle(pen,59,65,43,35);}
                 if(kind=="knife"){g.FillPolygon(metal,new[]{new Point(82,91),new Point(88,1),new Point(112,76),new Point(109,91)});g.FillRectangle(gold,68,91,61,10);g.FillRectangle(metal,85,101,23,74);}
                 if(kind=="grenade"){g.FillEllipse(metal,54,71,87,104);g.FillRectangle(gold,77,49,32,26);g.DrawLines(pen,new[]{new Point(87,48),new Point(129,50),new Point(145,104)});g.DrawEllipse(pen,61,40,24,22);}
                 if(kind=="flash"){g.FillRectangle(metal,68,65,60,110);g.FillEllipse(metal,68,55,60,20);g.DrawLines(pen,new[]{new Point(84,55),new Point(130,39),new Point(144,90)});}

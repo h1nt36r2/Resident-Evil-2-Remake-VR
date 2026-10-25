@@ -75,11 +75,15 @@ function G.stop()
     active=false;raw=nil;generator=nil;pose=nil;pending=nil;gesture:reset()
 end
 function G.reset_session()
-    G.stop();G.locked=false
+    G.stop();G.locked=false;G.pickup=nil
     if G.ready then G.status='New player scene: grenade interaction reset' end
+end
+function G.begin_pickup(wt)
+    G.pickup={wt=tostring(wt),expires=os.clock()+3}
 end
 function G.step(i,current,enabled)
     active=false
+    if G.pickup and (os.clock()>G.pickup.expires or not enabled or not i or not i.active or not i.rightGrip) then G.pickup=nil end
     if not enabled or not G.ready or G.locked or not i or not i.active or not current or not current.safe then G.stop();return end
     local ok,gen=pcall(function()
         if not current.slot:call('get_IsSubWeapon') then return nil end
@@ -89,6 +93,10 @@ function G.step(i,current,enabled)
     if not ok or not gen then G.stop();return end
     if raw and raw.weapon~=current.weapon then G.stop() end
     raw=current;generator=gen;active=true
+    if G.pickup and G.pickup.wt==tostring(current.wt) then
+        gesture:reset();gesture.identity=tostring(current.weapon)..':'..tostring(current.slot)
+        gesture.lastGrip=false;gesture.lastLeft=i.leftGrip==true;G.pickup=nil
+    end
     -- Snapshot BEFORE release; game's hand can start returning to its holster on release.
     if i.rightGrip then
         local captured,why=pcall(function()

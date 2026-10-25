@@ -128,6 +128,20 @@ function N.init(predicate)
     api.reload=method(equipment_t,"executeReload",{WT,"System.Int32"},"System.Boolean")
     api.capacity=method(slot_t,"get_MaxNumber",{},"System.Int32")
     api.change=method(equipment_t,'changeWeapon',{sdk.game_namespace('EquipmentDefine.EquipCategory'),WT,sdk.game_namespace('EquipmentDefine.WeaponParts')},'System.Void')
+    api.equipSlot=method(sdk.find_type_definition(sdk.game_namespace('survivor.Inventory')),'equipSlot',{'System.Int32'},'System.Boolean')
+    local hold=method(equipment_t,'checkHold',{WT},'System.Boolean')
+    sdk.hook(hold,function(args)
+        local value=nil
+        if N.beltSub and N.beltHold and current and current.safe and N.beltOwner==current.equipment
+            and sdk.to_managed_object(args[2])==current.equipment then
+            value=N.beltHold=='held' and sdk.to_int64(args[3])==N.beltSub or false
+        end
+        thread.get_hook_storage().re2ivrBeltHold=value
+    end,function(ret)
+        local value=thread.get_hook_storage().re2ivrBeltHold
+        if value~=nil then return sdk.to_ptr(value and 1 or 0) end
+        return ret
+    end)
     local category=sdk.find_type_definition(sdk.game_namespace('EquipmentDefine.EquipCategory'))
     for _,field in ipairs(category and category:get_fields() or {}) do
         local name=field:get_name():lower():gsub('_','')
@@ -225,6 +239,7 @@ function N.refresh()
         -- Fresh player/new game owns a fresh ammo ledger. Never touch the old scene's weapon.
         N.sessionPlayer=N.observedPlayer;N.sceneEpoch=(N.sceneEpoch or 0)+1
         enabled=false;hidden=nil;waiting={};N.events={};N.faults={};N.pumpPending={};N.ledger={};N.auditFrame=0
+        N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil
     end
     current=nextCurrent;if current and current.safe then N.auditFrame=N.auditFrame+1 end
     if current then
@@ -258,8 +273,6 @@ function N.model_source(wt)
 end
 local function select_owned(wt,sub)
     if not N.scene_safe() or not current then return false,'Unsafe scene' end
-    local category=api.mainCategory;if sub then category=api.subCategory end
-    if category==nil then return false,'Native equip category unavailable' end
     local manager=sdk.get_managed_singleton(sdk.game_namespace('PlayerManager'))
     local player=manager and manager:call('get_CurrentPlayer')
     local inv=player and component(player,'survivor.Inventory')
@@ -270,8 +283,10 @@ local function select_owned(wt,sub)
         if slot and not slot:call('get_IsEmpty') and not slot:call('get_IsDeadSlot')
             and (sub or slot:call('get_IsWeapon')==true)
             and (slot:call('get_IsSubWeapon')==true)==sub and slot:call('get_WeaponType')==wt then
-            -- Native equip only: no item creation, no ammo spending, no speculative parts flags.
-            api.change:call(current.equipment,category,wt,slot:call('get_WeaponParts'))
+            -- Let Inventory update its MainSlot/SubSlot and equipment events together.
+            -- Direct Equipment.changeWeapon alone can leave the inventory's sub-slot unchanged.
+            if current.slot~=slot and api.equipSlot:call(inv,n)~=true then return false,'Native inventory refused belt item' end
+            if sub then N.beltSub=wt;N.beltOwner=current.equipment else N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil end
             return true,'Native belt equip requested'
         end
     end
@@ -279,6 +294,28 @@ local function select_owned(wt,sub)
 end
 function N.select_subweapon(wt)return select_owned(wt,true)end
 function N.select_mainweapon(wt)return select_owned(wt,false)end
+function N.select_shortcut(direction)
+    if direction~='up' and direction~='down' then return false,'Unsupported shortcut direction' end
+    if not current or not current.safe then return false,'Unsafe scene' end
+    local inv=component(current.player,'survivor.Inventory')
+    if not inv then return false,'Inventory unavailable' end
+    local ok,assigned=pcall(require('re2ivr.shortcuts').read,inv)
+    local row=ok and assigned[direction]
+    if not row then return false,'Assigned '..direction..' shortcut empty/unavailable' end
+    local wt=tonumber(row.weaponType)
+    if not wt then return false,'Invalid shortcut weapon' end
+    local selected,why=select_owned(wt,row.sub)
+    return selected,why,wt
+end
+function N.update_belt_hold(input,allowed)
+    if not allowed or not input or not input.active or not current or N.beltOwner~=current.equipment then
+        N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil;return
+    end
+    if not N.beltSub then return end
+    if input.rightGrip then N.beltHold='held'
+    elseif input.leftGrip then N.beltHold='release_left' -- pin hand must not immediately draw the knife
+    else N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil end
+end
 function N.scene_safe()
     if N.readError then return false end
     if current then return current.safe end
@@ -300,7 +337,7 @@ function N.visible(value)
     if not value then api.draw:call(current.weapon,false);hidden=current.weapon
     elseif hidden==current.weapon then api.draw:call(current.weapon,true);hidden=nil end
 end
-function N.stop() enabled=false;N.visible(true) end
+function N.stop() enabled=false;N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil;N.visible(true) end
 function N.commit(expected,n)
     local before=read()
     assert(enabled and before and before.safe and same(before,expected),"Native snapshot changed")

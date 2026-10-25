@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.7.1-scene"
+local VERSION="0.8.0-quickslots"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -126,6 +126,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
         if not tracking then engine:reset('Tracking resumed: release and squeeze right grip');last=now end
         tracking=true
         refresh_scene()
+        Native.update_belt_hold(input,settings.enabled and not settings.nativeControls)
         local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls)
         if not grenadeOK then Grenade.locked=true;Grenade.stop();Grenade.status=tostring(grenadeError) end
         if Inventory.learn(current,settings.visualBindings) then gear={};json.dump_file("re2ivr_mvp_settings.json",settings) end
@@ -145,16 +146,29 @@ re.on_pre_application_entry("UpdateBehavior",function()
         Native.control(immersive or false)
         for _,event in ipairs(Native.drain_events()) do engine:spent(event.key,event.profile or (state and state.profile)) end
         local oldStage,oldPlace=engine.stage,engine.place
-        if current and frames%120==0 then
+        if current and frames%30==0 then
             local gear_ok,items=pcall(Inventory.read,settings.visualBindings,settings.profiles)
             if gear_ok then gear=items else gear={} end
         end
         -- Check belt pickups before grip-anywhere consumes the press as a gun draw.
-        local picked,pick_error,pick_kind,pick_wt=pcall(Quickslots.step,input,current,gear,engine,Native.select_subweapon,Native.select_mainweapon)
-        if picked and pick_error and pick_kind=='pistol' then pendingBeltDraw={wt=tostring(pick_wt),expires=now+3} end
+        local picked,pick_error,pick_kind,pick_wt,consumed=pcall(Quickslots.step,input,current,gear,engine,Native.select_subweapon,Native.select_mainweapon,Native.select_shortcut)
+        if not picked then Quickslots.message='Belt selection failed: '..tostring(pick_error);consumed=true end
+        if picked and pick_error then
+            if pick_kind=='pistol' then pendingBeltDraw={wt=tostring(pick_wt),expires=now+3}
+            else pendingBeltDraw=nil end
+            if pick_kind=='grenade' or pick_kind=='flash' then Grenade.begin_pickup(pick_wt) end
+        end
+        Native.update_belt_hold(input,settings.enabled and not settings.nativeControls)
         if pendingBeltDraw and (not input.rightGrip or now>pendingBeltDraw.expires)then pendingBeltDraw=nil end
         if settings.nativeControls then engine:reset('Native shooting/reloading recovery mode')
-        elseif picked and pick_error then engine:reset('Belt item selected');VR.pulse(false)
+        elseif picked and pick_error then
+            engine:reset('Belt item selected');VR.pulse(false)
+            if pick_kind=='pistol' and state and current.safe and tostring(current.wt)==tostring(pick_wt) then
+                local pickupInput={};for k,v in pairs(input)do pickupInput[k]=v end
+                pickupInput.drawFromBelt=true;pickupInput.eject=false
+                engine:step(pickupInput,state,dt);pendingBeltDraw=nil
+            end
+        elseif consumed then engine:reset('Empty/blocked belt zone: grip consumed')
         else
             local controlsInput=input
             if not settings.physicalReload then controlsInput={};for k,v in pairs(input)do controlsInput[k]=v end;controlsInput.eject=false;controlsInput.leftGrip=false end
@@ -166,8 +180,6 @@ re.on_pre_application_entry("UpdateBehavior",function()
             if engine.place=='held' then pendingBeltDraw=nil end
         end
         if state and state.profile=='pump' and not engine:needs_cycle(state.key) then Native.ack_pump(state.key) end
-        if not picked then Quickslots.message='Grenade slot unavailable: '..tostring(pick_error)
-        elseif pick_error then engine:reset('Grenade selected');VR.pulse(false) end
         Native.visible(not immersive or not current.safe or engine.place=="held")
         Belt.publish(current,input,gear,engine,settings,now)
         if oldStage~=engine.stage then VR.pulse(true) end
@@ -190,7 +202,8 @@ re.on_pre_application_entry("UpdateBehavior",function()
                 nativeInfinity=current and current.infinity or false,fireGateReady=Native.fireGateReady,
                 ammoFault=current and Native.faults[Native.key(current)] or nil,quickDraw=settings.quickDraw,nativeControls=settings.nativeControls,
                 safe=current and current.safe,reasons=current and current.reasons,weaponName=current and current.name,
-                input={rightGrip=input.rightGrip,leftGrip=input.leftGrip},snapshotAvailable=state~=nil})
+                input={rightGrip=input.rightGrip,leftGrip=input.leftGrip},snapshotAvailable=state~=nil,
+                beltSelection=Quickslots.message,shortcutStatus=require('re2ivr.shortcuts').status,beltSubWeapon=Native.beltSub,beltHold=Native.beltHold})
         end
     end)
     if not ok then
