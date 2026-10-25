@@ -74,6 +74,10 @@ end
 function G.stop()
     active=false;raw=nil;generator=nil;pose=nil;pending=nil;gesture:reset()
 end
+function G.reset_session()
+    G.stop();G.locked=false
+    if G.ready then G.status='New player scene: grenade interaction reset' end
+end
 function G.step(i,current,enabled)
     active=false
     if not enabled or not G.ready or G.locked or not i or not i.active or not current or not current.safe then G.stop();return end

@@ -34,6 +34,11 @@ function M.new(commit,options)
         self:cancel(message);self.place="holstered";self.armed=false;self.drop=nil;self.last={}
     end
     function self:can_fire() return self.place=="held" and self.stage=="ready" and not self.locked and (self.availableAmmo or 0)>0 and not self:needs_cycle() end
+    function self:reset_session()
+        self:reset('New player scene: release grip and re-grab')
+        self.identity=nil;self.currentKey=nil;self.availableAmmo=nil
+        self.cycles={};self.failedKeys={};self.lastAmmo={};self.locked=false
+    end
     function self:reload_blocked() return self.place=="held" or self.stage~="ready" end
     function self:transact(n,s)
         -- Consume the interaction BEFORE calling native code. Never retry an uncertain write.

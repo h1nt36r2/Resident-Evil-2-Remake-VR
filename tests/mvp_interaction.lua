@@ -73,4 +73,10 @@ do
  b.eject=true;t();b.eject=false;b.leftGrip=true;t();b.left=a.cylinder;t();assert(a.locked)
  for _=1,10 do t() end;assert(not a:can_fire())
 end
-print("PASS magazine geometry/slide, round-by-round revolver, signed wrist close, conservation, one-shot commits, grip/holster/drop, scene and ammo conflict handling")
+do
+ local e=C.new(function()error('Must not reload during scene reset')end)
+ e.cycles.old=true;e.failedKeys.old=true;e.lastAmmo.old=99;e.locked=true;e.identity='old'
+ e:reset_session()
+ assert(not e.locked and not next(e.cycles) and not next(e.failedKeys) and not next(e.lastAmmo) and e.identity==nil and e.place=='holstered')
+end
+print("PASS magazine geometry/slide, revolver, ammo conservation, grip, scene conflict and full new-player session reset")

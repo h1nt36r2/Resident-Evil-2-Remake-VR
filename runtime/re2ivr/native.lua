@@ -31,6 +31,7 @@ local enabled=false
 local policy=function() return false end
 local waiting={}
 local function account(raw,baseline,accepted)
+    if raw.player~=N.sessionPlayer then return end -- discard callbacks from a previous player scene
     local k=key(raw)
     local ok,n=pcall(function() return api.loaded:call(raw.equipment,raw.wt) end)
     if ok and n<baseline then
@@ -53,6 +54,7 @@ end
 local function read()
     local manager=sdk.get_managed_singleton(sdk.game_namespace("PlayerManager"))
     local player=manager and manager:call("get_CurrentPlayer")
+    N.observedPlayer=player
     if not player then return nil,"No player" end
     local eq=component(player,"survivor.Equipment")
     local condition=component(player,"survivor.SurvivorCondition")
@@ -90,12 +92,12 @@ local function read()
         end
     end
     local name_ok,name=pcall(function() return slot:call('get_WeaponName') end)
-    return {equipment=eq,weapon=weapon,slot=slot,wt=wt,name=name_ok and tostring(name) or '',ranged=ranged,safe=#reasons==0,reasons=reasons,reserve=reserve,
+    return {player=player,equipment=eq,weapon=weapon,slot=slot,wt=wt,name=name_ok and tostring(name) or '',ranged=ranged,safe=#reasons==0,reasons=reasons,reserve=reserve,
         loaded=ranged and api.loaded:call(eq,wt) or 0,capacity=ranged and api.capacity:call(slot) or 0,
         reloadable=ranged and api.reloadable:call(eq,wt) or 0,infinity=slot:call("get_Infinity")}
 end
 local function same(a,b)
-    return a and b and a.weapon==b.weapon and a.equipment==b.equipment and a.slot==b.slot
+    return a and b and a.player==b.player and a.weapon==b.weapon and a.equipment==b.equipment and a.slot==b.slot
         and a.wt==b.wt and a.loaded==b.loaded and a.capacity==b.capacity and a.reloadable==b.reloadable and a.reserve==b.reserve
 end
 
@@ -211,7 +213,20 @@ function N.init(predicate)
     block(method(equipment_t,"requestReload",{},"System.Void"),"reload")
 end
 function N.refresh()
-    current=read();if current and current.safe then N.auditFrame=N.auditFrame+1 end
+    local ok,nextCurrent=pcall(read)
+    if not ok then
+        -- Scene construction can briefly invalidate a component. Retry next sample;
+        -- do not persistently disable the mod or dereference the previous scene.
+        N.readError=tostring(nextCurrent);current=nil;enabled=false;hidden=nil
+        return nil
+    end
+    N.readError=nil
+    if N.sessionPlayer~=N.observedPlayer then
+        -- Fresh player/new game owns a fresh ammo ledger. Never touch the old scene's weapon.
+        N.sessionPlayer=N.observedPlayer;N.sceneEpoch=(N.sceneEpoch or 0)+1
+        enabled=false;hidden=nil;waiting={};N.events={};N.faults={};N.pumpPending={};N.ledger={};N.auditFrame=0
+    end
+    current=nextCurrent;if current and current.safe then N.auditFrame=N.auditFrame+1 end
     if current then
         local k=key(current);local a=waiting[k]
         if a then
@@ -265,6 +280,7 @@ end
 function N.select_subweapon(wt)return select_owned(wt,true)end
 function N.select_mainweapon(wt)return select_owned(wt,false)end
 function N.scene_safe()
+    if N.readError then return false end
     if current then return current.safe end
     local manager=sdk.get_managed_singleton(sdk.game_namespace('PlayerManager'))
     local player=manager and manager:call('get_CurrentPlayer')

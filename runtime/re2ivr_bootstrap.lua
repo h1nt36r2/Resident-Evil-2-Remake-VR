@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.7.0-weapons"
+local VERSION="0.7.1-scene"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -22,7 +22,6 @@ local settings={enabled=true,visuals=true,physicalGrenades=true,nativeHolsterMod
 local settings_ok,loaded=pcall(json.load_file,"re2ivr_mvp_settings.json")
 if not settings_ok then loaded=nil end
 if type(loaded)=="table" then
-    if type(loaded.titleBackground)=='string' and #loaded.titleBackground<160 then settings.titleBackground=loaded.titleBackground end
     for _,k in ipairs({"enabled","visuals","physicalGrenades","cleanStereo","nativeHolsterModels","nativeGrenadeModels","quickDraw","nativeControls","physicalReload","beltVisible"}) do if type(loaded[k])=="boolean" then settings[k]=loaded[k] end end
     if loaded.recenterMode=='both' or loaded.recenterMode=='yaw' or loaded.recenterMode=='height' then settings.recenterMode=loaded.recenterMode end
     if loaded.recenterBind=='right_stick' or loaded.recenterBind=='left_grip_r3' or loaded.recenterBind=='off' then settings.recenterBind=loaded.recenterBind end
@@ -94,6 +93,17 @@ end
 local frames,last,vr_session=0,os.clock(),false
 local tracking=false
 local pendingBeltDraw
+local sceneEpoch
+local function refresh_scene()
+    current=Native.refresh()
+    if sceneEpoch~=Native.sceneEpoch then
+        sceneEpoch=Native.sceneEpoch
+        engine:reset_session();Grenade.reset_session()
+        gear={};pendingBeltDraw=nil;Quickslots.last=true;frames=0
+        -- Height bias ownership remains with Controls; never accumulate a new offset on scene load.
+        stereoStatus={status='scene_changed',sceneEpoch=sceneEpoch}
+    end
+end
 re.on_pre_application_entry("UpdateBehavior",function()
     -- Must run before the weapon adapter, including title-screen/network dialogs.
     local dialog_ok,dialog_error=pcall(Presentation.tick,os.clock())
@@ -108,14 +118,14 @@ re.on_pre_application_entry("UpdateBehavior",function()
             Native.control(false)
             if tracking then
                 -- Refresh once before restoring visibility; do not retain an old scene weapon.
-                current=Native.refresh();Native.visible(true);engine:reset('Tracking suspended: native controls restored')
+                refresh_scene();Native.visible(true);engine:reset('Tracking suspended: native controls restored')
             end
             tracking=false;state=nil;last=now
             return -- No per-frame inventory, geometry, calibration or diagnostic work in standby.
         end
         if not tracking then engine:reset('Tracking resumed: release and squeeze right grip');last=now end
         tracking=true
-        current=Native.refresh()
+        refresh_scene()
         local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls)
         if not grenadeOK then Grenade.locked=true;Grenade.stop();Grenade.status=tostring(grenadeError) end
         if Inventory.learn(current,settings.visualBindings) then gear={};json.dump_file("re2ivr_mvp_settings.json",settings) end
@@ -174,7 +184,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
             json.dump_file('re2ivr_model_status.json',{schema=1,ready=Models.ready,status=Models.status,quickslotRequests=Quickslots.requests,quickslotStatus=Quickslots.message})
             json.dump_file("re2ivr_mvp_status.json",{schema=1,version=VERSION,ready=ready,enabled=settings.enabled,
                 active=input.active,profile=state and state.profile or "unsupported",weaponType=current and current.wt or nil,
-                place=engine.place,stage=engine.stage,message=engine.message,locked=engine.locked,
+                place=engine.place,stage=engine.stage,message=engine.message,locked=engine.locked,sceneEpoch=sceneEpoch,sceneReadError=Native.readError,
                 grenadeStatus=Grenade.status,grenadeReady=Grenade.ready,grenadeLocked=Grenade.locked,grenadeStage=Grenade.gesture.stage,
                 loaded=state and state.loaded or nil,reserve=state and state.reserve or nil,commits=engine.commits,error=err,
                 nativeInfinity=current and current.infinity or false,fireGateReady=Native.fireGateReady,
