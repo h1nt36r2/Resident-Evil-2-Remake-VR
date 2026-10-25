@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.8.4"
+local VERSION="0.8.5"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -15,6 +15,7 @@ local Profiles=require("re2ivr.profiles")
 local Models=require('re2ivr.models')
 local Quickslots=require('re2ivr.quickslots')
 local Belt=require('re2ivr.belt')
+local BeltDraw=require('re2ivr.belt_draw')
 local Grenade=require('re2ivr.grenade_native')
 local Menu=require('re2ivr.menu')
 local MenuControls=require('re2ivr.menu_controls_native')
@@ -162,12 +163,18 @@ re.on_pre_application_entry("UpdateBehavior",function()
         local picked,pick_error,pick_kind,pick_wt,consumed=pcall(Quickslots.step,input,current,gear,engine,Native.select_subweapon,Native.select_mainweapon,Native.select_shortcut)
         if not picked then Quickslots.message='Belt selection failed: '..tostring(pick_error);consumed=true end
         if picked and pick_error then
-            if pick_kind=='pistol' then pendingBeltDraw={wt=tostring(pick_wt),expires=now+3}
+            if pick_kind=='pistol' then pendingBeltDraw=BeltDraw.begin(pick_wt,now,sceneEpoch)
             else pendingBeltDraw=nil end
             if pick_kind=='grenade' or pick_kind=='flash' then Grenade.begin_pickup(pick_wt) end
         end
         Native.update_belt_hold(input,settings.enabled and not settings.nativeControls)
-        if pendingBeltDraw and (not input.rightGrip or now>pendingBeltDraw.expires)then pendingBeltDraw=nil end
+        local drawStatus
+        pendingBeltDraw,drawStatus=BeltDraw.poll(pendingBeltDraw,input,current,now,sceneEpoch)
+        if drawStatus=='timed_out' then Quickslots.message='Selected belt weapon did not finish equipping; release grip and check shortcut assignment' end
+        if drawStatus=='ready' then
+            if not pendingBeltDraw.drawRequested then pendingBeltDraw.drawRequested=Native.draw_selected(pendingBeltDraw.wt) end
+            if not state then pendingBeltDraw=nil end -- native-only weapon: draw confirmed, no physical profile needed
+        end
         if Grenade.is_live() then engine:reset('Live grenade held: release right grip')
         elseif settings.nativeControls then engine:reset('Native shooting/reloading recovery mode')
         elseif picked and pick_error then
@@ -175,9 +182,11 @@ re.on_pre_application_entry("UpdateBehavior",function()
             if pick_kind=='pistol' and state and current.safe and tostring(current.wt)==tostring(pick_wt) then
                 local pickupInput={};for k,v in pairs(input)do pickupInput[k]=v end
                 pickupInput.drawFromBelt=true;pickupInput.eject=false
-                engine:step(pickupInput,state,dt);pendingBeltDraw=nil
+                engine:step(pickupInput,state,dt)
+                if BeltDraw.complete(pendingBeltDraw,current,engine) then pendingBeltDraw=nil end
             end
         elseif consumed then engine:reset('Empty/blocked belt zone: grip consumed')
+        elseif pendingBeltDraw and drawStatus=='waiting' then engine:reset('Waiting for selected belt weapon')
         else
             local controlsInput=input
             if not settings.physicalReload then controlsInput={};for k,v in pairs(input)do controlsInput[k]=v end;controlsInput.eject=false;controlsInput.leftGrip=false end
@@ -186,7 +195,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
                 controlsInput.drawFromBelt=true
             end
             engine:step(controlsInput,state,dt)
-            if engine.place=='held' then pendingBeltDraw=nil end
+            if BeltDraw.complete(pendingBeltDraw,current,engine) then pendingBeltDraw=nil end
         end
         if state and state.profile=='pump' and not engine:needs_cycle(state.key) then Native.ack_pump(state.key) end
         Native.visible(not immersive or not current.safe or engine.place=="held")

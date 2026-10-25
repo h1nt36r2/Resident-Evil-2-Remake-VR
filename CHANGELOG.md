@@ -1,3 +1,10 @@
+# 0.8.5
+
+- Fix shoulder/main-weapon selection: request native main category change using reflected parts; redraw only confirmed equipped weapon.
+- Preserve belt grip through asynchronous weapon switch; previous held gun cannot complete a shotgun draw.
+- Support typed WeaponParts fields; keep native selection diagnostics.
+- Add delayed pistol-to-shotgun draw and cancellation regression fixtures. Hardware confirmation pending.
+
 # 0.8.4 additions
 
 - Grenade input: grip pouch, right trigger primes a native live shell, release grip throws the same shell; one debit at priming.

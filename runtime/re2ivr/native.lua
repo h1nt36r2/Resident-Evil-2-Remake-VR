@@ -310,13 +310,19 @@ local function select_owned(wt,sub)
             local accepted,message=require('re2ivr.equip').apply(slot,n,inv,current.equipment,api,wt,sub,current.slot==slot)
             if not accepted then return false,message end
             if sub then N.beltSub=wt;N.beltHold='held';N.beltOwner=current.equipment else N.beltSub=nil;N.beltHold=nil;N.beltOwner=nil end
-            return true,'Native belt equip requested'
+            return true,message
         end
     end
     return false,'Belt item no longer owned'
 end
 function N.select_subweapon(wt)return select_owned(wt,true)end
 function N.select_mainweapon(wt)return select_owned(wt,false)end
+function N.draw_selected(wt)
+    if not current or not current.safe or Story.native or current.isDevice or tostring(current.wt)~=tostring(wt) then return false end
+    api.draw:call(current.weapon,true)
+    if hidden==current.weapon then hidden=nil end
+    return true
+end
 function N.select_shortcut(direction)
     if direction~='up' and direction~='down' then return false,'Unsupported shortcut direction' end
     if not current or not current.safe then return false,'Unsafe scene' end
