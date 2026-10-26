@@ -23,7 +23,7 @@ try:
     os.chdir(root)
     for p in (root/'runtime').rglob('*.lua'):run(p.read_text(encoding='utf-8'),p.name,False)
     run("package.path='runtime/?.lua;'..package.path",'path')
-    for name in ('mvp_interaction.lua','mvp_weapon_families.lua','mvp_grenade.lua','mvp_grenade_native.lua','mvp_menu.lua','mvp_quickslots.lua','mvp_belt.lua','mvp_shortcuts.lua','mvp_menu_controls.lua','mvp_menu_controls_native.lua','mvp_story.lua','mvp_story_crosshair.lua','mvp_equip.lua','mvp_belt_draw.lua','mvp_subweapon_native.lua','mvp_bindings.lua'):
+    for name in ('mvp_flashlight.lua','mvp_interaction.lua','mvp_weapon_families.lua','mvp_grenade.lua','mvp_grenade_native.lua','mvp_menu.lua','mvp_quickslots.lua','mvp_belt.lua','mvp_shortcuts.lua','mvp_menu_controls.lua','mvp_menu_controls_native.lua','mvp_story.lua','mvp_story_crosshair.lua','mvp_equip.lua','mvp_belt_draw.lua','mvp_subweapon_native.lua','mvp_bindings.lua'):
         run((root/'tests'/name).read_text(encoding='utf-8'),name)
     print('PASS fixtures; no RE2 or headset runtime used')
 finally:
