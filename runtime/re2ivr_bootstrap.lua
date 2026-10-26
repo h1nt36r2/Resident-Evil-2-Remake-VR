@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.8.7"
+local VERSION="0.8.8"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -21,7 +21,7 @@ local Menu=require('re2ivr.menu')
 local MenuControls=require('re2ivr.menu_controls_native')
 local Story=require('re2ivr.story')
 local settings={enabled=true,visuals=true,physicalGrenades=true,nativeHolsterModels=true,nativeGrenadeModels=true,cleanStereo=false,visualBindings={},profiles={["1"]="magazine"},hipX=.23,hipY=-.70,hipZ=.04,pouchX=-.23,pouchY=-.62,pouchZ=-.03,
-    quickDraw=true,nativeControls=false,physicalReload=false,beltVisible=true,beltForward=.03,heightOffset=0,recenterMode='both',recenterBind='right_stick',recenterHold=1}
+    quickDraw=true,nativeControls=false,physicalReload=true,beltVisible=true,beltForward=.03,heightOffset=0,recenterMode='both',recenterBind='right_stick',recenterHold=1}
 local settings_ok,loaded=pcall(json.load_file,"re2ivr_mvp_settings.json")
 if not settings_ok then loaded=nil end
 if type(loaded)=="table" then
@@ -54,6 +54,11 @@ end
 settings.reloadRevision=2
 if type(loaded)~='table' or loaded.beltRevision~=1 then settings.physicalReload=false;settings.nativeControls=false;settings.beltVisible=true end
 settings.beltRevision=1
+-- Enable the requested in-game reload flow once for existing installations.
+if type(loaded)~='table' or loaded.physicalReloadRevision~=1 then
+    settings.physicalReload=true;settings.nativeControls=false
+end
+settings.physicalReloadRevision=1
 if type(loaded)~='table' or loaded.grenadeInputRevision~=3 then settings.physicalGrenades=true end
 settings.grenadeInputRevision=3
 local engine,current,input,state,err,ready
@@ -135,7 +140,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
         if not tracking then engine:reset('Tracking resumed: release and squeeze right grip');last=now end
         tracking=true
         refresh_scene()
-        Native.update_belt_hold(input,settings.enabled and not settings.nativeControls)
+        Native.update_belt_hold(input,settings.enabled and not settings.nativeControls,settings.physicalReload and engine.place=="held" and input.rightGrip and not Grenade.is_live())
         local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls and not Story.native,{player=Native.observedPlayer,safe=Native.scene_safe(true)})
         if not grenadeOK then Grenade.locked=true;Grenade.stop();Grenade.status=tostring(grenadeError) end
         if Inventory.learn(current,settings.visualBindings) then gear={};json.dump_file("re2ivr_mvp_settings.json",settings) end
@@ -167,7 +172,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
             else pendingBeltDraw=nil end
             if pick_kind=='grenade' or pick_kind=='flash' then Grenade.begin_pickup(pick_wt) end
         end
-        Native.update_belt_hold(input,settings.enabled and not settings.nativeControls)
+        Native.update_belt_hold(input,settings.enabled and not settings.nativeControls,settings.physicalReload and engine.place=="held" and input.rightGrip and not Grenade.is_live())
         local drawStatus
         pendingBeltDraw,drawStatus=BeltDraw.poll(pendingBeltDraw,input,current,now,sceneEpoch)
         if drawStatus=='timed_out' then Quickslots.message='Selected belt weapon did not finish equipping; release grip and check shortcut assignment' end
@@ -243,7 +248,7 @@ re.on_draw_ui(function()
     imgui.text("RE2 Immersive VR "..VERSION)
     local assignmentUIOK,assignmentUIError=pcall(MenuControls.ui)
     if not assignmentUIOK then imgui.text('Shortcut panel unavailable: '..tostring(assignmentUIError)) end
-    imgui.text('Default reload: normal game button. Physical reload is optional while belt is being developed.')
+    imgui.text('Physical reload is enabled automatically. Right B opens; left pouch grip takes ammo; insert and operate the weapon.')
     if imgui.button(settings.physicalReload and 'Use native button reload' or 'Enable experimental physical reload') then
         settings.physicalReload=not settings.physicalReload;engine:reset('Reload mode changed');Native.stop();json.dump_file('re2ivr_mvp_settings.json',settings)
     end

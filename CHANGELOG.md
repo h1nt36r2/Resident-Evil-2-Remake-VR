@@ -1,5 +1,9 @@
 # 0.8.7
 
+## 0.8.8
+
+Ручная перезарядка автоматически активна после обновления; левый grip при основном оружии имеет приоритет для боеприпасов. Добавлены контроллерная подсказка и плоский магазин в SteamVR, swept-проверка вставки и отмена захвата затвора при боковом движении. Проверка в шлеме остаётся. См. docs/releases/0.8.8.md.
+
 - Add explicit owned-weapon quickslot assignment panel in inventory; remove exact GuiState enum-name dependency.
 - Verify native assignments; persist per-character mod belt overrides when native assignment is rejected/unavailable. Do not claim native HUD changes for fallback.
 - Validate ownership at read and equip; add save rollback and return-to-game-bindings action.

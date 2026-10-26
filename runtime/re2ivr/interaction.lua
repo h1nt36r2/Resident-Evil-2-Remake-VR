@@ -27,7 +27,7 @@ function M.new(commit,options)
     function self:spent(k,profile) if profile=='pump' then self.cycles[k]=true end end
     function self:needs_cycle(k) return self.cycles[k or self.currentKey]==true end
     function self:cancel(message)
-        self.stage="ready";self.expected=nil;self.amount=nil;self.slideStart=nil;self.round=false;self.insertArmed=false;self.slideReleased=false;self.pumpStart=nil;self.pumpPulled=false
+        self.stage="ready";self.expected=nil;self.amount=nil;self.slideStart=nil;self.round=false;self.insertArmed=false;self.slideReleased=false;self.magPrevious=nil;self.pumpStart=nil;self.pumpPulled=false
         self.message=message or "Reload cancelled"
     end
     function self:reset(message)
@@ -145,15 +145,25 @@ function M.new(commit,options)
                 end
             elseif self.stage=="empty_well" and lg and dist(i.left,self.pouch)<.18 then
                 self.amount=math.min(s.capacity-s.loaded,s.reserve,s.reloadable)
-                if self.amount>0 or s.loaded>0 then self.stage="magazine_held";self.message="Insert magazine into grip" end
+                if self.amount>0 or s.loaded>0 then self.magPrevious=nil;self.stage="magazine_held";self.message="Insert magazine into grip" end
             elseif self.stage=="magazine_held" then
                 if not i.leftGrip then self.stage="empty_well";self.amount=nil;self.message="Magazine returned to pouch"
                 else
                     local p=sub(i.left,self.well);local depth=dot(p,i.rightBasis[2])
                     local radial=len(sub(p,mul(i.rightBasis[2],depth)))
                     -- Enter from below, aligned within a forgiving cone, then cross seating plane.
-                    if depth<-.05 then self.insertArmed=true end
-                    if self.insertArmed and depth>=-.015 and depth<.08 and radial<.075
+                    if depth<-.05 and radial<.12 then self.insertArmed=true end
+                    -- Test the swept segment in weapon-local coordinates for fast insertions.
+                    local prev=self.magPrevious
+                    local crossing=false
+                    if prev and prev.y<-.015 and p.y>=-.015 and p.y>prev.y then
+                        local t=(-.015-prev.y)/(p.y-prev.y)
+                        local x=prev.x+(p.x-prev.x)*t
+                        local z=prev.z+(p.z-prev.z)*t
+                        crossing=x*x+z*z<.075*.075
+                    end
+                    self.magPrevious=v(dot(p,i.rightBasis[1]),depth,dot(p,i.rightBasis[3]))
+                    if self.insertArmed and ((depth>=-.015 and depth<.08 and radial<.075) or crossing)
                         and dot(i.leftBasis[2],i.rightBasis[2])>.35 then
                         self.stage="inserted";self.insertArmed=false;self.message="Release left grip; grasp and pull slide"
                         self.slideReleased=false
@@ -166,6 +176,12 @@ function M.new(commit,options)
                 end
             elseif self.stage=="slide_held" then
                 local pull=dot(sub(i.left,i.right),i.rightBasis[3])-self.slideStart
+                local relative=sub(i.left,self.slide)
+                local radial=len(sub(relative,mul(i.rightBasis[3],dot(relative,i.rightBasis[3]))))
+                if i.leftGrip and radial>.14 then
+                    self.stage="inserted";self.pulled=false;self.slideReleased=false
+                    self.message="Grasp the slide again";self.last={rightGrip=i.rightGrip,leftGrip=i.leftGrip,eject=i.eject};return
+                end
                 if pull>.065 then self.pulled=true end
                 if not i.leftGrip then
                     if self.pulled then

@@ -6,6 +6,7 @@ function Q.step(input,current,gear,engine,select,selectMain,selectShortcut,block
     local right=input.rightGrip and not Q.last
     local left=input.leftGrip and not Q.lastLeft
     Q.last=input.rightGrip==true;Q.lastLeft=input.leftGrip==true
+    if engine.o.physicalReload and engine.place=="held" and input.rightGrip then left=false end
     if current.isDevice or current.storyNative or blocked or (not right and not left)then return false end
     local _,_,body=C.anchors(input,engine.o)
     local nearest,distance
