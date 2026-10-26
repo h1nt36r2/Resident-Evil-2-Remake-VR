@@ -2,7 +2,7 @@
 if reframework:get_game_name()~="re2" then return end
 if _G.RE2IVR_MVP_LOADED then return end
 _G.RE2IVR_MVP_LOADED=true
-local VERSION="0.8.8"
+local VERSION="0.8.9"
 local Interaction=require("re2ivr.interaction")
 local VR=require("re2ivr.vr")
 local Native=require("re2ivr.native")
@@ -20,6 +20,7 @@ local Grenade=require('re2ivr.grenade_native')
 local Menu=require('re2ivr.menu')
 local MenuControls=require('re2ivr.menu_controls_native')
 local Story=require('re2ivr.story')
+local Flashlight=require('re2ivr.flashlight')
 local settings={enabled=true,visuals=true,physicalGrenades=true,nativeHolsterModels=true,nativeGrenadeModels=true,cleanStereo=false,visualBindings={},profiles={["1"]="magazine"},hipX=.23,hipY=-.70,hipZ=.04,pouchX=-.23,pouchY=-.62,pouchZ=-.03,
     quickDraw=true,nativeControls=false,physicalReload=true,beltVisible=true,beltForward=.03,heightOffset=0,recenterMode='both',recenterBind='right_stick',recenterHold=1}
 local settings_ok,loaded=pcall(json.load_file,"re2ivr_mvp_settings.json")
@@ -67,6 +68,7 @@ local controls=Controls.new(settings)
 local stereoStatus={status='not_sampled'}
 Presentation.init()
 Grenade.init()
+Flashlight.init()
 Menu.init(settings)
 -- Stability hotfix: no new native Mesh allocation/render hooks, even with old settings.
 Models.ready=false;Models.status='Native mesh copies disabled in stability build'
@@ -95,6 +97,7 @@ local initialized,failure=pcall(function()
 end)
 ready=initialized;err=initialized and "" or tostring(failure)
 local function stop(message)
+    Flashlight.stop()
     Grenade.stop()
     Native.stop();engine:reset(message);input=nil;state=nil
     Models.prepare(nil,nil,nil,nil,nil,false)
@@ -127,6 +130,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
         local now=os.clock()
         input=VR.sample()
         if not input.active then
+            Flashlight.stop()
             Grenade.stop()
             Belt.publish(nil,input,gear,engine,settings,now)
             Native.control(false)
@@ -140,6 +144,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
         if not tracking then engine:reset('Tracking resumed: release and squeeze right grip');last=now end
         tracking=true
         refresh_scene()
+        Flashlight.step(input,current,settings.enabled,sceneEpoch)
         Native.update_belt_hold(input,settings.enabled and not settings.nativeControls,settings.physicalReload and engine.place=="held" and input.rightGrip and not Grenade.is_live())
         local grenadeOK,grenadeError=pcall(Grenade.step,input,current,settings.enabled and settings.physicalGrenades and not settings.nativeControls and not Story.native,{player=Native.observedPlayer,safe=Native.scene_safe(true)})
         if not grenadeOK then Grenade.locked=true;Grenade.stop();Grenade.status=tostring(grenadeError) end
@@ -238,6 +243,7 @@ re.on_pre_application_entry("UpdateBehavior",function()
         json.dump_file("re2ivr_mvp_error.json",{version=VERSION,error=err})
     end
 end)
+re.on_post_application_entry("LateUpdateBehavior",function() Flashlight.apply() end)
 re.on_frame(function()
     if not ready or not settings.enabled or not settings.visuals or settings.cleanStereo or not state or not input or not input.active or not current or not current.safe then return end
     local ok,why=pcall(Visuals.draw,engine,input,state,gear)
